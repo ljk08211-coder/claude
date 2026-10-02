@@ -5,14 +5,16 @@
   python youtube_digest.py check
   python youtube_digest.py run <유튜브URL> [--out 폴더] [--threshold 0.3]
                            [--min-gap 2] [--max-scenes 40] [--keep-video]
-                           [--cookies-from-browser chrome]
+                           [--cookies-from-browser chrome] [--gemini auto|always|off]
 
+자막이 없거나 부족하면 GEMINI_API_KEY 로 제미나이에게 영상을 보여주고 gemini_summary.md 를 받는다.
 설치는 절대 하지 않는다. 필요한 프로그램이 없으면 목록과 설치 명령만 출력하고 종료(코드 2).
 자막이 없으면 meta.json 의 subtitle.status 가 "none" 이 되고 콘솔에 NO_SUBTITLES 를 출력한다.
 """
 import argparse
 import html
 import json
+import os
 import platform
 import re
 import shutil
@@ -35,6 +37,8 @@ def missing_deps():
 
 def cmd_check(_args):
     missing = missing_deps()
+    key = "설정됨" if os.environ.get("GEMINI_API_KEY", "").strip() else "없음 (자막 부족 시 제미나이 보강 불가)"
+    print(f"GEMINI_API_KEY: {key}")
     if not missing:
         print("OK: yt-dlp, ffmpeg 모두 설치되어 있음")
         return 0
@@ -234,13 +238,32 @@ def cmd_run(args):
         capture_output=True, text=True, errors="replace",
     )
     video = next((p for p in out.glob("video.*") if p.suffix not in (".part", ".ytdl")), None)
-    if not video:
-        meta["scenes"] = {"status": "video_download_failed"}
-        (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"VIDEO_DOWNLOAD_FAILED: 장면 캡처를 못함. 결과 폴더: {out}")
-        return 1
 
     # 3) 장면 전환 캡처
+    rows, method = [], None
+    if video:
+        rows, method = make_scenes(video, out, vid, duration, cues, meta, args)
+        meta["scenes"] = {"status": "ok", "method": method, "count": len(rows),
+                          "threshold": args.threshold}
+    else:
+        meta["scenes"] = {"status": "video_download_failed"}
+        print("VIDEO_DOWNLOAD_FAILED: 영상을 받지 못해 장면 캡처를 못함")
+
+    # 4) 자막이 부족하면 제미나이에게 영상을 보여주고 요약 받기
+    meta["gemini"] = run_gemini(args, out, video, cues, duration, meta)
+
+    (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    if video and not args.keep_video:
+        video.unlink(missing_ok=True)
+
+    print(f"DONE: {out}")
+    print(f"  자막: {meta['subtitle']['status']}" + (f" ({meta['subtitle'].get('lang')})" if cues else ""))
+    print(f"  장면: {len(rows)}개 ({method})" if video else "  장면: 없음 (영상 다운로드 실패)")
+    print(f"  제미나이: {meta['gemini']['status']}")
+    return 0 if video or meta["gemini"]["status"] == "ok" else 1
+
+
+def make_scenes(video, out, vid, duration, cues, meta, args):
     scene_dir = out / "scenes"
     scenes = detect_scenes(video, scene_dir, args.threshold)
     method = "scene_change"
@@ -269,18 +292,47 @@ def cmd_run(args):
                      f"| ![]({r['image']}) | {sub} |  |")
     (out / "scenes.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (out / "scenes.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+    return rows, method
 
-    meta["scenes"] = {"status": "ok", "method": method, "count": len(rows),
-                      "threshold": args.threshold}
-    (out / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    if not args.keep_video:
-        video.unlink(missing_ok=True)
+# ---------- 제미나이 ----------
 
-    print(f"DONE: {out}")
-    print(f"  자막: {meta['subtitle']['status']}" + (f" ({meta['subtitle'].get('lang')})" if cues else ""))
-    print(f"  장면: {len(rows)}개 ({method})")
-    return 0
+def subtitle_shortfall(cues, duration):
+    """자막만으로 부족한 이유. 충분하면 None."""
+    if not cues:
+        return "자막 없음"
+    chars = sum(len(c[2]) for c in cues)
+    if chars < 200:
+        return f"자막이 너무 짧음({chars}자)"
+    if duration >= 60 and chars / (duration / 60) < 60:
+        return f"자막 밀도가 낮음(분당 {int(chars / (duration / 60))}자, 말보다 화면 위주 영상)"
+    return None
+
+
+def run_gemini(args, out, video, cues, duration, meta):
+    if args.gemini == "off":
+        return {"status": "off"}
+    reason = subtitle_shortfall(cues, duration)
+    if args.gemini == "auto" and not reason:
+        return {"status": "not_needed"}
+    reason = reason or "사용자 요청(--gemini always)"
+
+    import gemini_video  # 같은 폴더의 스크립트
+    context = (f"참고: 제목 '{meta['title']}', 채널 '{meta['channel']}'. "
+               f"이 영상은 {reason}이라 화면 내용까지 봐야 한다.")
+    try:
+        text, how, model = gemini_video.summarize(args.url, video, context, duration)
+    except gemini_video.GeminiError as e:
+        if str(e) == "NO_KEY":
+            print("GEMINI_SKIPPED_NO_KEY: 자막이 부족하지만 GEMINI_API_KEY 가 설정되지 않음")
+            return {"status": "no_key", "reason": reason}
+        print(f"GEMINI_FAILED: {e}")
+        return {"status": "failed", "reason": reason, "error": str(e)}
+    (out / "gemini_summary.md").write_text(
+        f"<!-- 제미나이 {model} · {how} · 이유: {reason} -->\n{text}\n", encoding="utf-8")
+    print(f"GEMINI_OK: gemini_summary.md ({model})")
+    return {"status": "ok", "reason": reason, "model": model, "method": how,
+            "file": "gemini_summary.md"}
 
 
 def main():
@@ -295,6 +347,8 @@ def main():
     r.add_argument("--max-scenes", type=int, default=40)
     r.add_argument("--keep-video", action="store_true")
     r.add_argument("--cookies-from-browser", default=None)
+    r.add_argument("--gemini", choices=["auto", "always", "off"], default="auto",
+                   help="auto: 자막이 부족할 때만 제미나이 사용 (기본)")
     args = p.parse_args()
     sys.exit({"check": cmd_check, "run": cmd_run}[args.cmd](args))
 
