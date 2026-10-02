@@ -1,0 +1,8 @@
+{
+  "label": "",
+  "scenes": [
+    { "start": 0, "end": 2, "step": "STEP 01", "title": "말로 찍은 영상\n그대로 넣기", "pills": ["무음컷", "자막", "효과음"], "footer": "[클로드코드]가 편집합니다 →" },
+    { "start": 2, "end": 4, "step": "STEP 02", "title": "문장마다\n카드가 바뀐다", "pills": ["자동", "도트", "o:모눈종이"], "footer": "위 절반은 카드" },
+    { "start": 4, "end": 6, "step": "STEP 03", "title": "아래는 얼굴\n완성본 mp4", "pills": ["1080x1920", "o:한 번에"], "footer": "[편집해줘] 한 마디 →" }
+  ]
+}

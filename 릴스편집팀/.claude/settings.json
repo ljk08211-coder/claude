@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 .claude/skills/reels-edit-lite/scripts/edit.py:*)",
+      "Bash(node .claude/skills/grid-dot-cards/scripts/render.mjs:*)",
+      "Bash(open out/)",
+      "Bash(open out)",
+      "Bash(python .claude/skills/reels-edit-lite/scripts/edit.py:*)",
+      "Bash(explorer out)",
+      "Bash(explorer out/)"
+    ]
+  }
+}
