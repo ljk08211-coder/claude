@@ -137,6 +137,7 @@ python3 <스킬 폴더>/scripts/fetch_1688.py run "<1688 링크>" --out detail-p
   1. 제품 사진을 `create-upload-url`로 한 장씩 올리고, 받은 mediaId를 `generate-image`의 `imageReferences`에 넣는다. 비율은 `PORTRAIT_3_4`, `SQUARE_1_1` 같은 값으로 준다.
   2. 결과는 `get-generate-image-job`으로 받는다. 캔바 요금제의 AI 사용 한도를 쓰므로 처음 쓸 때 몇 장 만들지 알리고 진행한다.
   3. 한도 초과나 오류면 C로 넘어간다.
+  4. 캔바 생성 결과는 이 환경에서 200px 미리보기만 받을 수 있다(원본 링크는 서명돼 있고, AI 생성 파일은 디자인으로 가져오기도 막혀 있다). 원본(1264px)은 사용자가 "Open generated image" 링크에서 직접 내려받아야 하므로, 파일명·용도·링크 표를 만들어 전달한다. 로컬에서 합성할 이미지는 힉스필드나 로컬 자료로 만든다.
 
   **C. 제미나이 이미지** (`GEMINI_API_KEY`가 있을 때)
   ```bash
