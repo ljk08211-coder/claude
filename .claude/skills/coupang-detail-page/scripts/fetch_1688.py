@@ -58,7 +58,13 @@ def clean_img(url):
     # 썸네일 접미사(_60x60.jpg, .jpg_.webp 등)를 떼고 원본을 받는다
     url = re.sub(r"(\.(?:jpg|jpeg|png))_.*$", r"\1", url, flags=re.I)
     url = re.sub(r"\.\d+x\d+(\.(?:jpg|jpeg|png))$", r"\1", url, flags=re.I)
+    url = re.sub(r"\.(?:search|summ|\d+x\d+xz?)\.jpg$", "", url, flags=re.I)
     return url
+
+
+def seller_of(url):
+    m = re.search(r"!!(\d+)-\d+-cib", url)
+    return m.group(1) if m else None
 
 
 def uniq(seq):
@@ -91,8 +97,9 @@ def parse(text):
 
     # 속성: {"name":"材质","value":"不锈钢"} 형태가 흔하다
     attrs = []
+    # {"name":"材质","value":"不锈钢"} 또는 {"fid":..,"name":..,"outputType":0,"value":..} 형태
     for m in re.finditer(
-            r'\{"name"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"value"\s*:\s*"((?:[^"\\]|\\.)*)"', text):
+            r'\{[^{}]*?"name"\s*:\s*"((?:[^"\\]|\\.)*)"[^{}]*?"value"\s*:\s*"((?:[^"\\]|\\.)*)"', text):
         try:
             attrs.append([json.loads('"%s"' % m.group(1)), json.loads('"%s"' % m.group(2))])
         except json.JSONDecodeError:
@@ -108,10 +115,40 @@ def parse(text):
                 sku.append({"prop": prop.get("prop"), "values": vals})
         except (json.JSONDecodeError, AttributeError):
             pass
-    data["sku"] = sku
+    # 옵션별 공급가
+    prices = {}
+    m = re.search(r'"skuInfoMap"\s*:\s*\{', text)
+    if m:
+        for sm in re.finditer(r'"((?:[^"\\]|\\.)*)"\s*:\s*\{[^{}]*?"price"\s*:\s*"([\d.]+)"', text[m.end() - 1:m.end() + 20000]):
+            prices.setdefault(sm.group(1), sm.group(2))
+    data["sku_prices"] = prices
+
+    # 포장 무게·치수 표 (HTML 표)
+    pack = []
+    pm = re.search(r'class="offer-pack-info-list".*?<table[^>]*>(.*?)</table>', text, re.S)
+    if pm:
+        for row in re.findall(r"<tr>(.*?)</tr>", pm.group(1), re.S):
+            cells = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", row, re.S)]
+            if cells:
+                pack.append(cells)
+    data["pack_table"] = pack
+
+    # 구매자 리뷰 키워드 (예: 质量好 141)
+    data["review_tags"] = uniq([(t.group(2), int(t.group(1))) for t in re.finditer(
+        r'\{"count"\s*:\s*(\d+)\s*,\s*"name"\s*:\s*"([^"]+)"\s*,\s*"type"\s*:\s*"impr"', text)])[:20]
+
+    data["sku"] = [dict(t) for t in uniq([tuple((k, tuple(v) if isinstance(v, list) else v) for k, v in d.items()) for d in sku])]
+    for d in data["sku"]:
+        d["values"] = list(d["values"])
 
     imgs = [clean_img(u) for u in IMG_RE.findall(text.replace("\\/", "/"))]
-    imgs = [u for u in uniq(imgs) if "ibank" in u or "imgextra" in u]
+    # 상품 사진은 img/ibank 경로에 있다. imgextra 쪽은 대부분 아이콘·배너라 뺀다
+    imgs = [u for u in uniq(imgs) if "/img/ibank/" in u]
+    # 추천 상품 사진이 섞이므로 가장 많이 나온 판매자 ID의 사진만 남긴다
+    sellers = [seller_of(u) for u in imgs if seller_of(u) and seller_of(u) != "0"]
+    if sellers:
+        top = max(set(sellers), key=sellers.count)
+        imgs = [u for u in imgs if seller_of(u) in (top, "0")]
     data["main_images"] = imgs
     return data
 
@@ -185,11 +222,14 @@ def main():
             detail_imgs, detail_text = parse_detail(fetch(data["detail_url"]))
         except Exception as e:  # noqa: BLE001
             data["detail_error"] = str(e)[:150]
-    if not detail_imgs:
-        # 저장한 HTML에는 상세 영역이 이미 펼쳐져 있는 경우가 많다
-        detail_imgs = [u for u in data["main_images"][a.max_main:]]
-        data["main_images"] = data["main_images"][:a.max_main]
-    data["detail_images"] = [u for u in detail_imgs if u not in data["main_images"]]
+    page_imgs = data["main_images"]
+    if detail_imgs:
+        # 저장한 HTML에는 상세 이미지도 펼쳐져 있으니 대표 이미지에서 뺀다
+        data["main_images"] = [u for u in page_imgs if u not in detail_imgs][:a.max_main]
+    else:
+        detail_imgs = page_imgs[a.max_main:]
+        data["main_images"] = page_imgs[:a.max_main]
+    data["detail_images"] = detail_imgs
     data["detail_text"] = detail_text
 
     if not a.no_download:
@@ -204,7 +244,9 @@ def main():
     ok_detail = sum(1 for s in data.get("detail_saved", []) if s.get("file"))
     print("OK source=%s" % source)
     print("제목: %s" % (data.get("subject") or data.get("title")))
-    print("속성 %d개, 옵션 %d묶음" % (len(data["attributes"]), len(data["sku"])))
+    print("속성 %d개, 옵션 %d묶음, 옵션가격 %d개, 포장표 %d줄, 리뷰키워드 %d개" % (
+        len(data["attributes"]), len(data["sku"]), len(data.get("sku_prices", {})),
+        len(data.get("pack_table", [])), len(data.get("review_tags", []))))
     print("대표 이미지 %d장, 상세 이미지 %d장 저장 -> %s" % (ok_main, ok_detail, a.out))
     if not a.no_download and ok_main + ok_detail == 0:
         print("NO_IMAGES: 이미지를 찾지 못했습니다. 상세 영역 스크린샷을 받아 진행하세요")
