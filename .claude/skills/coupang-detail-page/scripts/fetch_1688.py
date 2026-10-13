@@ -162,6 +162,16 @@ def parse_detail(text):
     return uniq(imgs), words[:5000]
 
 
+def too_small(path, min_side=300):
+    """상세 영역에 섞여 들어온 아이콘·배너(가로세로 300px 미만)는 버린다."""
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            return min(im.size) < min_side
+    except Exception:  # noqa: BLE001 - Pillow가 없거나 깨진 파일이면 그대로 둔다
+        return False
+
+
 def download(urls, folder, prefix, limit):
     os.makedirs(folder, exist_ok=True)
     saved = []
@@ -172,6 +182,9 @@ def download(urls, folder, prefix, limit):
             req = urllib.request.Request(u, headers={"User-Agent": UA, "Referer": "https://detail.1688.com/"})
             with urllib.request.urlopen(req, timeout=30) as r, open(path, "wb") as f:
                 f.write(r.read())
+            if too_small(path):
+                os.remove(path)
+                continue
             saved.append({"file": path, "url": u})
         except Exception as e:  # noqa: BLE001 - 한 장 실패는 건너뛴다
             saved.append({"file": None, "url": u, "error": str(e)[:120]})
