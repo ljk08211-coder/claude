@@ -160,7 +160,12 @@ def estimate(case, trades, cfg, today=None):
         result["notes"].append(f"실거래·KB·호가 차이 {hi / lo - 1:.0%} → 가장 낮은 값 사용")
     elif result["model_value"]:
         result["value"] = result["model_value"]
-        result["confidence"] = "높음" if n >= 5 else "보통" if n >= 3 else "낮음"
+        same_complex = sum(c["tier"] != "같은 동네 유사 단지" for c in result["comps"])
+        if not same_complex:
+            result["confidence"] = "낮음"
+            result["notes"].append("같은 단지 거래가 없어 인근 유사 단지로만 추정")
+        else:
+            result["confidence"] = "높음" if same_complex >= 5 else "보통" if same_complex >= 3 else "낮음"
     else:
         result.update(value=lo, confidence="낮음")
         result["notes"].append("실거래 비교사례 없이 KB·호가만으로 추정")

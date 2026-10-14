@@ -12,7 +12,9 @@ TAX_HOLDERS = ("세무서", "시청", "구청", "군청", "국민건강", "국�
 RED_KEYWORDS = {
     "유치권": "유치권 신고",
     "법정지상권": "법정지상권 성립 여지",
-    "지분": "지분 경매",
+    "지분경매": "지분 경매",
+    "지분 경매": "지분 경매",
+    "공유지분": "지분 경매",
     "대지권미등기": "대지권 미등기",
     "대지권 미등기": "대지권 미등기",
     "토지별도등기": "토지 별도등기",
@@ -81,7 +83,7 @@ def analyze(case, bid, exec_cost_rate=0.005):
             opposable = True  # 기준을 모르면 대항력 있다고 가정
         got = paid.get(i, 0)
         if opposable:
-            assumed = deposit - got if t.get("claimed_dividend") else deposit
+            assumed = int(round(deposit - got)) if t.get("claimed_dividend") else deposit
         else:
             assumed = 0
         assumed_amount += assumed
@@ -91,9 +93,10 @@ def analyze(case, bid, exec_cost_rate=0.005):
             yellow.append(f"대항력 있는 임차인 {t.get('name', '')} 미배당 {assumed:,}원 인수")
         if opposable and not t.get("fixed_date"):
             yellow.append(f"임차인 {t.get('name', '')} 확정일자 정보 없음 — 명세서 재확인")
-        tenant_rows.append({**t, "opposable": opposable, "dividend": got, "assumed": assumed})
+        tenant_rows.append({**t, "opposable": opposable, "dividend": int(round(got)), "assumed": assumed})
 
-    text = " ".join([*(case.get("flags") or []), case.get("notes") or "",
+    # notes 는 설명용 자유 글이라 키워드 검사에서 뺀다 ("지분 전부" 같은 말에 오탐)
+    text = " ".join([*(case.get("flags") or []),
                      (case.get("auction") or {}).get("special_conditions") or ""])
     for kw, label in RED_KEYWORDS.items():
         if kw in text and label not in red:
@@ -101,6 +104,8 @@ def analyze(case, bid, exec_cost_rate=0.005):
     for kw, label in YELLOW_KEYWORDS.items():
         if kw in text and label not in yellow:
             yellow.append(label)
+    if (case.get("auction") or {}).get("share_sale") and "지분 경매" not in red:
+        red.append("지분 경매")
     if (case.get("auction") or {}).get("resale") and "재매각 사건 (보증금 20%)" not in red:
         red.append("재매각 사건 (보증금 20%)")
 

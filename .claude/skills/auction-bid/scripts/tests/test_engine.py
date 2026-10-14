@@ -137,6 +137,24 @@ class TestRights(unittest.TestCase):
         self.assertFalse(r["tenants"][0]["opposable"])
         self.assertEqual(r["eviction_type"], "tenant_partial")  # 근저당 1.8억 뒤라 일부만 배당
 
+    def test_whole_unit_sold_by_all_shares_is_not_share_auction(self):
+        case = base_case()
+        case["notes"] = "매각지분 황의순 100분의 95, 김미향 100분의 5 각 지분전부"
+        self.assertNotIn("지분 경매", rights.analyze(case, 2e8)["red_flags"])
+        case["auction"]["share_sale"] = True
+        self.assertIn("지분 경매", rights.analyze(case, 2e8)["red_flags"])
+
+    def test_senior_tenant_deposit_above_bid_is_assumed(self):
+        # 2025타경21775 형태: 대항력 임차인 보증금 2.2억, 최선순위는 그 뒤 가압류
+        case = base_case()
+        case["occupancy"] = {"type": "tenant"}
+        case["rights"] = [{"type": "가압류", "date": "2024-07-16", "amount": 0}]
+        case["tenants"] = [{"name": "김", "move_in": "2022-07-27", "fixed_date": "2022-07-27",
+                            "deposit": 220_000_000, "claimed_dividend": True}]
+        r = rights.analyze(case, 153_300_000)
+        self.assertEqual(r["assumed_amount"], 220_000_000 - int(round(153_300_000 * 0.995)))
+        self.assertIsInstance(r["assumed_amount"], int)
+
     def test_red_keyword(self):
         case = base_case()
         case["flags"] = ["유치권 신고 있음"]

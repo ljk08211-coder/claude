@@ -20,10 +20,13 @@
     "failed_count": 0,
     "sale_date": "",
     "resale": false,
+    "share_sale": false,
     "reduction_rate": null,
     "special_conditions": ""
   },
-  "occupancy": { "type": "unknown" },
+  "occupancy": {
+    "type": "unknown"
+  },
   "rights": [],
   "tenants": [],
   "flags": [],

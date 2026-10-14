@@ -48,12 +48,12 @@ python3 <스킬>/scripts/auction.py init 2026타경12345
 | `property.exclusive_area` | 감정평가서 | **전용면적** ㎡ |
 | `property.floor`, `top_floor`, `build_year` | 감정평가서·건축물대장 | |
 | `auction.appraisal`, `min_price`, `failed_count`, `sale_date` | 사건정보 | 원 단위 정수 |
-| `auction.resale`, `special_conditions` | 매각물건명세서 | 재매각이면 true. 특별매각조건 원문 |
+| `auction.resale`, `share_sale`, `special_conditions` | 매각물건명세서 | 재매각이면 `resale` true. 일부 지분만 파는 경우만 `share_sale` true (공유자 "지분 전부"를 함께 팔면 건물 전체라 false). 특별매각조건·인수 조건 원문 |
 | `auction.reduction_rate` | 법원 | 유찰 저감률. 모르면 null(기본 20%) |
 | `occupancy.type` | 현황조사서 | `owner`(소유자·채무자) / `tenant` / `vacant` / `unknown` |
 | `rights[]` | 등기부 갑구·을구 | `{"type":"근저당","date":"YYYY-MM-DD","amount":원,"holder":"○○은행"}`. 근저당·저당·압류·가압류·가처분·가등기·전세권·임차권·경매개시결정 모두 |
 | `tenants[]` | 매각물건명세서 | `{"name","move_in","fixed_date","deposit","monthly_rent","claimed_dividend":true/false}` |
-| `flags[]` | 명세서·현황조사서·감정평가서 | 유치권, 법정지상권, 지분, 대지권미등기, 토지별도등기, 위반건축물, 폐문부재, 관리비 체납 같은 문구를 원문 그대로 |
+| `flags[]` | 명세서·현황조사서·감정평가서 | 유치권, 법정지상권, 대지권미등기, 토지별도등기, 위반건축물, 폐문부재, 관리비 체납 같은 문구를 원문 그대로. 위험 키워드는 `flags` 와 `special_conditions` 에서만 찾는다 (`notes` 는 설명용이라 검사 안 함) |
 
 ## 3단계: 실거래 수집
 

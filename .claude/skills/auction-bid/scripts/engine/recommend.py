@@ -47,7 +47,7 @@ def run(case, cfg, market_value, rent, results, today=None):
         max_bid = best_flip["max_bid"]
         hold = best_flip["hold_years"]
         profit_of = lambda b: deal.flip(b, hold)["net_profit"]
-        primary_label = f"매도차익 ({hold:g}년 보유)"
+        primary_label = f"매도차익 ({hold:g}년 보유)" if max_bid else "매도차익"
 
     resale = bool(auc.get("resale"))
     deposit = round(min_price * cfg["winprob"]["resale_deposit_rate" if resale else "deposit_rate"])
