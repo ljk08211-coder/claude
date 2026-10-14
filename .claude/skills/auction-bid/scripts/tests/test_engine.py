@@ -221,10 +221,24 @@ class TestEngine(unittest.TestCase):
     def test_index_ignores_unreported_months(self):
         rows = []
         for m, ppm in (("2026-06", 3.0e6), ("2026-07", 3.0e6), ("2026-08", 3.0e6), ("2026-09", 2.6e6), ("2026-10", 2.4e6)):
-            rows += [{"date": f"{m}-10", "price": int(ppm * 80), "area": 80.0}] * 6
+            rows += [{"date": f"{m}-10", "price": int(ppm * 80), "area": 80.0, "apt_seq": f"A{i}",
+                      "apt_name": f"단지{i}", "dong": "좌동"} for i in range(12)]
         idx = market.regional_index(rows, TODAY)
         self.assertNotIn("2026-09", idx)  # 신고기한 안 지난 달은 가짜 하락으로 보면 안 된다
         self.assertEqual(market.time_factor(idx, "2026-09-10"), 1.0)
+
+    def test_index_ignores_which_complexes_sold(self):
+        # 단지 가격은 그대로인데 달마다 비싼/싼 단지가 번갈아 팔리면 지수는 평평해야 한다 (부산진구에서 잡힌 버그)
+        rows = []
+        for mi, m in enumerate(("2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08")):
+            for i in range(12):
+                cheap = (i + mi) % 2 == 0
+                if cheap and mi % 2:
+                    continue  # 홀수 달엔 싼 단지 거래가 적다
+                rows.append({"date": f"{m}-10", "price": 150_000_000 if cheap else 300_000_000, "area": 60.0,
+                             "apt_seq": f"A{i}", "apt_name": f"단지{i}", "dong": "범천동"})
+        idx = market.regional_index(rows, TODAY)
+        self.assertTrue(all(abs(v - 1) < 0.01 for v in idx.values()), idx)
 
     def test_win_model_uses_results(self):
         results = [{"lawd_cd": "26350", "property_type": "아파트", "sale_date": "2026-09-01",

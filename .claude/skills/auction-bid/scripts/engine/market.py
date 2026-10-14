@@ -27,15 +27,25 @@ def apt_matcher(prop, rows):
 
 
 def regional_index(trades, today):
-    """시군구 전체 거래의 월별 ㎡당 중앙값(3개월 이동평균) → {YYYY-MM: 지수}. 오늘 기준 1.0."""
+    """시군구 시세 지수 {YYYY-MM: 지수}, 마지막 완성월 = 1.0.
+
+    같은 단지·같은 평형끼리만 비교한다(각 거래가 ÷ 그 단지·평형 중앙값의 월별 중앙값).
+    ㎡당 중앙값으로 만들면 그 달에 어떤 단지가 팔렸는지에 따라 ±10% 넘게 출렁인다(부산진구에서 확인).
+    """
     # 실거래 신고기한이 30일이라 최근 두 달은 아직 덜 들어온 상태 → 지수에서 뺀다 (예전엔 가짜 하락으로 보였다)
     cutoff = (today.replace(day=1) - dt.timedelta(days=1)).replace(day=1).isoformat()[:7]
-    by_month = defaultdict(list)
+    groups = defaultdict(list)
     for t in trades:
-        if t["date"][:7] >= cutoff:
+        if t["date"][:7] < cutoff:
+            groups[(t.get("apt_seq") or (t["apt_name"], t["dong"]), round(t["area"]))].append(t)
+    by_month = defaultdict(list)
+    for rows in groups.values():
+        if len(rows) < 4:
             continue
-        by_month[t["date"][:7]].append(t["price"] / t["area"])
-    months = sorted(m for m, v in by_month.items() if len(v) >= 5)
+        med = statistics.median(r["price"] for r in rows)
+        for r in rows:
+            by_month[r["date"][:7]].append(r["price"] / med)
+    months = sorted(m for m, v in by_month.items() if len(v) >= 10)
     if len(months) < 3:
         return {}
     med = {m: statistics.median(by_month[m]) for m in months}
