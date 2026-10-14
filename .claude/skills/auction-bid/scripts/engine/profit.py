@@ -77,18 +77,31 @@ class Deal:
         sale = self.mv * (1 - s["sale_discount"]) * (1 + s["annual_price_growth"]) ** hold_years
         broker = taxes.broker_fee(sale, c["broker_vat"])
         it = a["items"]
+        costs = {**it, "대출이자": round(interest, -4), "보유세": round(holding_tax, -4),
+                 "공실 관리비": upkeep, "매도 중개보수": broker}
+        pretax = sale + rent_income - sum(costs.values())
+
+        tc = self.cfg["tax"]
         basis = (bid + it["인수금액"] + it["취득세 등"] + it["법무·등기비"]
                  + self.repair * c["capex_ratio"] + broker)
         resided = hold_years if inv["will_reside"] else 0
         cgt, cgt_why = taxes.capital_gains_tax(sale, basis, hold_years, self.houses_after, self.regulated,
-                                               resided, self.cfg["tax"]["multi_home_cgt_surcharge"])
-        costs = {**it, "대출이자": round(interest, -4), "보유세": round(holding_tax, -4),
-                 "공실 관리비": upkeep, "매도 중개보수": broker, "양도세(지방세 포함)": cgt}
-        net = sale + rent_income - sum(costs.values())
+                                               resided, tc["multi_home_cgt_surcharge"])
+        if inv.get("seller_type") == "business":
+            # 매매사업자: 이자·수리비 등 비용을 다 빼고 종합소득세 기본세율. 단기양도세율은 적용 안 됨.
+            # 조정지역 다주택 중과 대상이면 비교과세(둘 중 큰 세액)
+            tax = taxes.business_income_tax(pretax, tc.get("other_taxable_income", 0))
+            why = "매매사업자 종합소득세" + (" (다른 소득 합산)" if tc.get("other_taxable_income") else " (이 건만)")
+            if self.regulated and self.houses_after >= 2 and tc["multi_home_cgt_surcharge"] and cgt > tax:
+                tax, why = cgt, f"매매사업자 비교과세 → {cgt_why}"
+        else:
+            tax, why = cgt, cgt_why
+        costs["세금(지방세 포함)"] = tax
+        net = pretax - tax
         cash = a["total"] - a["loan"]
         return {"bid": bid, "hold_years": hold_years, "sale_price": round(sale, -4), "rent_income": rent_income,
-                "costs": costs, "net_profit": round(net), "cash_needed": round(cash, -4), "loan": a["loan"],
-                "roi": net / cash if cash > 0 else None, "cgt_reason": cgt_why}
+                "costs": costs, "net_pretax": round(pretax), "net_profit": round(net), "cash_needed": round(cash, -4), "loan": a["loan"],
+                "roi": net / cash if cash > 0 else None, "cgt_reason": why}
 
     def rental(self, bid):
         if not self.rent:
@@ -117,11 +130,16 @@ def _scan_max(ok, lo, hi, step):
     return best
 
 
+def profit_key(cfg):
+    return "net_pretax" if cfg["strategy"].get("target_basis") == "pretax" else "net_profit"
+
+
 def max_bid_flip(deal, hold_years, cfg):
     target = cfg["strategy"]["target_net_profit"]
     step = cfg["recommend"]["step"]
     hi = int(deal.mv * 1.1)
-    return _scan_max(lambda b: deal.flip(b, hold_years)["net_profit"] >= target, step, hi, step)
+    key = profit_key(cfg)
+    return _scan_max(lambda b: deal.flip(b, hold_years)[key] >= target, step, hi, step)
 
 
 def max_bid_rent(deal, cfg):

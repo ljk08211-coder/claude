@@ -65,6 +65,13 @@ def _progressive(base):
     return 0
 
 
+def business_income_tax(income, other_income=0):
+    """부동산매매사업자 종합소득세 + 지방소득세. 다른 종합소득이 있으면 그만큼 높은 구간에서 시작한다."""
+    if income <= 0:
+        return 0
+    return round((_progressive(other_income + income) - _progressive(other_income)) * 1.1)
+
+
 def capital_gains_tax(sale, basis, hold_years, houses_at_sale, regulated_at_acq, resided_years, surcharge_on=True):
     """양도소득세 + 지방소득세(10%). 반환: (세액, 설명)."""
     gain = sale - basis

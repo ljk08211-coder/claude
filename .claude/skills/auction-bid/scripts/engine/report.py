@@ -66,9 +66,15 @@ def markdown(case, mv, rec):
     if rec["pass_reasons"]:
         lines.append("- 패스 이유: " + " / ".join(rec["pass_reasons"]))
     if rec["picks"]:
-        lines += ["", "| 안 | 입찰가 | 낙찰확률 | 세후 순이익 |", "|---|---|---|---|"]
-        for name, p in rec["picks"].items():
-            lines.append(f"| {name} | {eok(p['bid'])} | {pct(p['prob'])} | {eok(p['profit'])} |")
+        b = rec.get("basis_label", "세후")
+        if b == "세전":
+            lines += ["", "| 안 | 입찰가 | 낙찰확률 | 세전 순이익 | 세후 |", "|---|---|---|---|---|"]
+            for name, p in rec["picks"].items():
+                lines.append(f"| {name} | {eok(p['bid'])} | {pct(p['prob'])} | {eok(p['profit'])} | {eok(p.get('after_tax'))} |")
+        else:
+            lines += ["", "| 안 | 입찰가 | 낙찰확률 | 세후 순이익 |", "|---|---|---|---|"]
+            for name, p in rec["picks"].items():
+                lines.append(f"| {name} | {eok(p['bid'])} | {pct(p['prob'])} | {eok(p['profit'])} |")
     nr = rec["next_round"]
     lines.append("")
     lines.append(f"- 이번 회차 유찰 확률 {pct(nr['fail_prob'])} → 유찰 시 다음 최저가 {eok(nr['min_price'])}"
@@ -141,7 +147,8 @@ def html_report(case, mv, rec, cfg):
     picks = ""
     for name, p in rec["picks"].items():
         picks += (f'<div class="pick{" main" if name == "추천" else ""}"><div class="sub">{name}</div>'
-                  f'<div class="bid">{eok(p["bid"])}</div><div>낙찰확률 {pct(p["prob"])} · 순이익 {eok(p["profit"])}</div>'
+                  f'<div class="bid">{eok(p["bid"])}</div><div>낙찰확률 {pct(p["prob"])} · {rec.get("basis_label", "세후")} 순이익 {eok(p["profit"])}'
+                  + (f' (세후 {eok(p.get("after_tax"))})' if rec.get("basis_label") == "세전" else "") + '</div>'
                   f'<div class="sub">입찰표: {p["bid"]:,}원 ({korean_amount(p["bid"])})</div></div>')
 
     comps = "".join(
@@ -154,7 +161,7 @@ def html_report(case, mv, rec, cfg):
     for s in rec["scenarios"]:
         a = s["at_max"] or s["at_min"]
         scen += (f"<tr><td>{s['hold_years']:g}년</td><td>{eok(s['max_bid'])}</td>"
-                 f"<td>{eok(s['at_min']['net_profit'])}</td><td>{e(a['cgt_reason'])}</td>"
+                 f"<td>{eok(s['at_min'].get('net_pretax'))} / {eok(s['at_min']['net_profit'])}</td><td>{e(a['cgt_reason'])}</td>"
                  f"<td>{eok(s['at_min']['cash_needed'])}</td></tr>")
 
     main_bid = rec["picks"].get("추천", {}).get("bid") or rec["min_price"]
@@ -164,6 +171,7 @@ def html_report(case, mv, rec, cfg):
     cost_rows = "".join(f"<tr><td>{e(k)}</td><td>{won(val)}</td></tr>" for k, val in detail["costs"].items())
     cost_rows += (f"<tr><td><b>매도가</b></td><td><b>{won(detail['sale_price'])}</b></td></tr>"
                   f"<tr><td>보유 중 월세 수입</td><td>{won(detail['rent_income'])}</td></tr>"
+                  f"<tr><td><b>세전 순이익</b></td><td><b>{won(detail['net_pretax'])}</b></td></tr>"
                   f"<tr><td><b>세후 순이익</b></td><td><b>{won(detail['net_profit'])}</b></td></tr>"
                   f"<tr><td>대출</td><td>{won(detail['loan'])}</td></tr>"
                   f"<tr><td>실투자금</td><td>{won(detail['cash_needed'])}</td></tr>")
@@ -216,8 +224,9 @@ def html_report(case, mv, rec, cfg):
 <div class="card">{nxt}</div>
 
 <h2>보유기간별 비교 (매도차익)</h2>
-<div class="card scroll"><table><tr><th>보유</th><th>수익 상한가</th><th>최저가 낙찰 시 순이익</th><th>양도세</th><th>최저가 낙찰 시 실투자금</th></tr>{scen}</table>
-<div class="sub">목표 세후 순이익 {eok(cfg['strategy']['target_net_profit'])} · 취득 후 {cfg['investor']['houses_owned'] + 1}주택 기준</div></div>
+<div class="card scroll"><table><tr><th>보유</th><th>수익 상한가</th><th>최저가 낙찰 시 순이익 (세전 / 세후)</th><th>세금</th><th>최저가 낙찰 시 실투자금</th></tr>{scen}</table>
+<div class="sub">목표 {rec.get('basis_label', '세후')} 순이익 {eok(cfg['strategy']['target_net_profit'])} · 취득 후 {cfg['investor']['houses_owned'] + 1}주택 기준
+ · {'부동산매매사업자 (종합소득세)' if cfg['investor'].get('seller_type') == 'business' else '개인 양도 (양도소득세)'} · 대출금리 {cfg['loan']['rate']:.1%}</div></div>
 
 <h2>추천가 기준 손익 상세 ({best_s['hold_years']:g}년 보유 후 매도)</h2>
 <div class="card scroll"><table>{cost_rows}</table>

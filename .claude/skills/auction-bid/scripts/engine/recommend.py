@@ -1,7 +1,7 @@
 """최종 추천: 최저가 ~ 상한가 사이에서 기대수익(낙찰확률 × 순이익)이 가장 큰 입찰가 + 보수/공격 안."""
 import math
 
-from .profit import Deal, max_bid_flip, max_bid_rent
+from .profit import Deal, max_bid_flip, max_bid_rent, profit_key
 from .winprob import WinModel
 
 
@@ -42,11 +42,14 @@ def run(case, cfg, market_value, rent, results, today=None):
     if strategy == "rent" and rent_max:
         max_bid = rent_max
         profit_of = lambda b: deal.rental(b)["annual_net"]
+        after_tax_of = profit_of
         primary_label = "임대수익"
     else:
         max_bid = best_flip["max_bid"]
         hold = best_flip["hold_years"]
-        profit_of = lambda b: deal.flip(b, hold)["net_profit"]
+        key = profit_key(cfg)
+        profit_of = lambda b: deal.flip(b, hold)[key]
+        after_tax_of = lambda b: deal.flip(b, hold)["net_profit"]
         primary_label = f"매도차익 ({hold:g}년 보유)" if max_bid else "매도차익"
 
     resale = bool(auc.get("resale"))
@@ -56,7 +59,10 @@ def run(case, cfg, market_value, rent, results, today=None):
         "scenarios": scenarios, "rental": rent_info, "win_model": wm.describe(prev_min), "prev_min": prev_min,
         "condition_grade": deal.condition_grade, "repair": deal.repair, "regulated": deal.regulated,
         "rights": deal.rights(max(min_price, max_bid or 0)),
+        "basis_label": "세전" if cfg["strategy"].get("target_basis") == "pretax" else "세후",
     }
+    if cfg["investor"].get("seller_type") == "business" and float(prop["exclusive_area"]) > 85:
+        out["rights"]["yellow_flags"].append("전용 85㎡ 초과 — 매매사업자 매도 시 건물분 부가세 10% 별도 (계산에 미반영)")
 
     # 2) 패스 판정
     reasons = []
@@ -91,7 +97,8 @@ def run(case, cfg, market_value, rent, results, today=None):
         picks = {}
         for name, c in (("보수", cons), ("추천", best), ("공격", curve[-1])):
             bid = odd_price(c["bid"], min_price, max_bid, cfg)
-            picks[name] = {"bid": bid, "prob": wm.prob(bid, min_price, market_value, prev_min), "profit": profit_of(bid)}
+            picks[name] = {"bid": bid, "prob": wm.prob(bid, min_price, market_value, prev_min), "profit": profit_of(bid),
+                           "after_tax": after_tax_of(bid)}
             picks[name]["ev"] = picks[name]["prob"] * picks[name]["profit"]
         out["picks"] = picks
     else:

@@ -11,7 +11,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engine import config, market, recommend, regions, report, rights, taxes  # noqa: E402
-from engine.profit import Deal, max_bid_flip  # noqa: E402
+import copy  # noqa: E402
+
+from engine.profit import Deal, max_bid_flip, profit_key  # noqa: E402
 from engine.winprob import WinModel  # noqa: E402
 
 TODAY = dt.date(2026, 10, 14)
@@ -196,13 +198,38 @@ class TestEngine(unittest.TestCase):
     def test_max_bid_hits_target(self):
         deal = Deal(base_case(), self.cfg, 250_000_000)
         mb = max_bid_flip(deal, 2.0, self.cfg)
-        target = self.cfg["strategy"]["target_net_profit"]
-        self.assertGreaterEqual(deal.flip(mb, 2.0)["net_profit"], target)
-        self.assertLess(deal.flip(mb + 100_000, 2.0)["net_profit"], target)
+        target, key = self.cfg["strategy"]["target_net_profit"], profit_key(self.cfg)
+        self.assertGreaterEqual(deal.flip(mb, 2.0)[key], target)
+        self.assertLess(deal.flip(mb + 100_000, 2.0)[key], target)
 
-    def test_two_year_hold_beats_short(self):
+    def individual(self):
+        cfg = copy.deepcopy(self.cfg)
+        cfg["investor"]["seller_type"] = "individual"
+        cfg["strategy"]["target_basis"] = "aftertax"
+        return cfg
+
+    def test_two_year_hold_beats_short_for_individual(self):
+        cfg = self.individual()
+        deal = Deal(base_case(), cfg, 250_000_000)
+        self.assertGreater(max_bid_flip(deal, 2.0, cfg), max_bid_flip(deal, 0.5, cfg))
+
+    def test_business_seller_short_flip_taxed_at_basic_rates(self):
         deal = Deal(base_case(), self.cfg, 250_000_000)
-        self.assertGreater(max_bid_flip(deal, 2.0, self.cfg), max_bid_flip(deal, 0.5, self.cfg))
+        f = deal.flip(180_000_000, 0.5)
+        self.assertIn("매매사업자", f["cgt_reason"])
+        self.assertEqual(f["costs"]["세금(지방세 포함)"], taxes.business_income_tax(f["net_pretax"]))
+        ind = Deal(base_case(), self.individual(), 250_000_000).flip(180_000_000, 0.5)
+        self.assertGreater(f["net_profit"], ind["net_profit"])  # 단기 70% 대신 기본세율
+
+    def test_other_income_raises_business_tax(self):
+        self.assertGreater(taxes.business_income_tax(30_000_000, 50_000_000), taxes.business_income_tax(30_000_000))
+
+    def test_user_cost_settings(self):
+        deal = Deal(base_case(), self.cfg, 250_000_000)
+        f = deal.flip(180_000_000, 0.5)
+        self.assertEqual(f["costs"]["법무·등기비"], 300_000)
+        self.assertEqual(f["costs"]["매도 중개보수"], round(f["sale_price"] * 0.004))
+        self.assertEqual(self.cfg["loan"]["rate"], 0.051)
 
     def test_win_prob_monotonic(self):
         wm = WinModel(self.cfg, "26350", "아파트", [], TODAY)
