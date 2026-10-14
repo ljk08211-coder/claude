@@ -105,6 +105,8 @@ def analyze(case, bid, exec_cost_rate=0.005):
         red.append("재매각 사건 (보증금 20%)")
 
     occ = (case.get("occupancy") or {}).get("type", "unknown")
+    if occ == "unknown":
+        yellow.append("점유자 미확인 — 현황조사서·전입세대열람으로 누가 사는지 확인 (명도비는 보수적으로 가정)")
     if occ == "tenant" and tenant_rows:
         main = max(tenant_rows, key=lambda t: int(t.get("deposit") or 0))
         dep = int(main.get("deposit") or 0)

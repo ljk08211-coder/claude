@@ -24,6 +24,8 @@ def run(case, cfg, market_value, rent, results, today=None):
     strategy = cfg["strategy"]["primary"]
     deal = Deal(case, cfg, market_value, rent)
     wm = WinModel(cfg, prop.get("lawd_cd", ""), prop.get("type", "아파트"), results, today)
+    rate = auc.get("reduction_rate") or cfg["winprob"]["reduction_rate"]
+    prev_min = round(min_price / (1 - rate)) if int(auc.get("failed_count") or 0) > 0 else None
 
     # 1) 전략별 상한가
     scenarios = []
@@ -51,7 +53,7 @@ def run(case, cfg, market_value, rent, results, today=None):
     deposit = round(min_price * cfg["winprob"]["resale_deposit_rate" if resale else "deposit_rate"])
     out = {
         "strategy": primary_label, "min_price": min_price, "max_bid": max_bid, "deposit": deposit,
-        "scenarios": scenarios, "rental": rent_info, "win_model": wm.source,
+        "scenarios": scenarios, "rental": rent_info, "win_model": wm.describe(prev_min), "prev_min": prev_min,
         "condition_grade": deal.condition_grade, "repair": deal.repair, "regulated": deal.regulated,
         "rights": deal.rights(max(min_price, max_bid or 0)),
     }
@@ -71,12 +73,12 @@ def run(case, cfg, market_value, rent, results, today=None):
     if max_bid and max_bid >= min_price:
         b = min_price
         while b <= max_bid:
-            p = wm.prob(b, min_price, market_value)
+            p = wm.prob(b, min_price, market_value, prev_min)
             pr = profit_of(b)
             curve.append({"bid": b, "prob": p, "profit": pr, "ev": p * pr})
             b += step
         if curve[-1]["bid"] != max_bid:
-            p = wm.prob(max_bid, min_price, market_value)
+            p = wm.prob(max_bid, min_price, market_value, prev_min)
             pr = profit_of(max_bid)
             curve.append({"bid": max_bid, "prob": p, "profit": pr, "ev": p * pr})
     out["curve"] = curve
@@ -89,24 +91,24 @@ def run(case, cfg, market_value, rent, results, today=None):
         picks = {}
         for name, c in (("보수", cons), ("추천", best), ("공격", curve[-1])):
             bid = odd_price(c["bid"], min_price, max_bid, cfg)
-            picks[name] = {"bid": bid, "prob": wm.prob(bid, min_price, market_value), "profit": profit_of(bid)}
+            picks[name] = {"bid": bid, "prob": wm.prob(bid, min_price, market_value, prev_min), "profit": profit_of(bid)}
             picks[name]["ev"] = picks[name]["prob"] * picks[name]["profit"]
         out["picks"] = picks
     else:
         out["picks"] = {}
 
     # 4) 다음 회차(유찰 시) 시나리오
-    nxt_min = round(min_price * (1 - (auc.get("reduction_rate") or cfg["winprob"]["reduction_rate"])))
+    nxt_min = round(min_price * (1 - rate))
     p_fail = wm.no_bid_prob(min_price, market_value)
     nxt_best = None
     if max_bid and max_bid >= nxt_min:
         b, best_ev = nxt_min, None
         while b <= max_bid:
-            ev = wm.prob(b, nxt_min, market_value) * profit_of(b)
+            ev = wm.prob(b, nxt_min, market_value, min_price) * profit_of(b)
             if best_ev is None or ev > best_ev[1]:
                 best_ev = (b, ev)
             b += step
-        nxt_best = {"bid": best_ev[0], "ev": best_ev[1], "prob": wm.prob(best_ev[0], nxt_min, market_value)}
+        nxt_best = {"bid": best_ev[0], "ev": best_ev[1], "prob": wm.prob(best_ev[0], nxt_min, market_value, min_price)}
     now_ev = out["picks"]["추천"]["ev"] if out["picks"] else 0
     wait_ev = p_fail * (nxt_best["ev"] if nxt_best else 0)
     out["next_round"] = {"min_price": nxt_min, "fail_prob": p_fail, "best": nxt_best,

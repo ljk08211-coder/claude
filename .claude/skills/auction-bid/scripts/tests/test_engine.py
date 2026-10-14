@@ -192,6 +192,22 @@ class TestEngine(unittest.TestCase):
         self.assertEqual(ps, sorted(ps))
         self.assertEqual(wm.prob(199_000_000, 200_000_000, 250_000_000), 0.0)
 
+    def test_failed_round_uses_previous_minimum(self):
+        wm = WinModel(self.cfg, "26350", "아파트", [], TODAY)
+        # 2025타경5349 형태: 시세 2억, 직전 최저가 1.463억, 이번 최저가 1.0241억
+        at_min = wm.prob(102_410_000, 102_410_000, 200_000_000, 146_300_000)
+        at_prev = wm.prob(146_300_000, 102_410_000, 200_000_000, 146_300_000)
+        self.assertLess(at_min, 0.1)
+        self.assertGreater(at_prev, 0.85)
+
+    def test_index_ignores_unreported_months(self):
+        rows = []
+        for m, ppm in (("2026-06", 3.0e6), ("2026-07", 3.0e6), ("2026-08", 3.0e6), ("2026-09", 2.6e6), ("2026-10", 2.4e6)):
+            rows += [{"date": f"{m}-10", "price": int(ppm * 80), "area": 80.0}] * 6
+        idx = market.regional_index(rows, TODAY)
+        self.assertNotIn("2026-09", idx)  # 신고기한 안 지난 달은 가짜 하락으로 보면 안 된다
+        self.assertEqual(market.time_factor(idx, "2026-09-10"), 1.0)
+
     def test_win_model_uses_results(self):
         results = [{"lawd_cd": "26350", "property_type": "아파트", "sale_date": "2026-09-01",
                     "winning_bid": str(int(250_000_000 * r)), "market_value": "250000000"}

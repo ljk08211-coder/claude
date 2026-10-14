@@ -28,8 +28,12 @@ def apt_matcher(prop, rows):
 
 def regional_index(trades, today):
     """시군구 전체 거래의 월별 ㎡당 중앙값(3개월 이동평균) → {YYYY-MM: 지수}. 오늘 기준 1.0."""
+    # 실거래 신고기한이 30일이라 최근 두 달은 아직 덜 들어온 상태 → 지수에서 뺀다 (예전엔 가짜 하락으로 보였다)
+    cutoff = (today.replace(day=1) - dt.timedelta(days=1)).replace(day=1).isoformat()[:7]
     by_month = defaultdict(list)
     for t in trades:
+        if t["date"][:7] >= cutoff:
+            continue
         by_month[t["date"][:7]].append(t["price"] / t["area"])
     months = sorted(m for m, v in by_month.items() if len(v) >= 5)
     if len(months) < 3:
@@ -49,6 +53,8 @@ def time_factor(index, date_str):
     key = date_str[:7]
     if key in index:
         return 1.0 / index[key]
+    if key > max(index):  # 지수 기준월 이후(신고 진행 중인 달)는 보정하지 않는다
+        return 1.0
     older = [m for m in index if m <= key]
     return 1.0 / index[max(older)] if older else 1.0 / index[min(index)]
 

@@ -82,6 +82,8 @@ class WinModel:
             self.quantiles = [list(p) for p in wc["default_quantiles"]]
             self.source = (f"기본 분포 (지역 낙찰사례 {len(ratios)}건 < {wc['min_cases']}건) — "
                            "record 로 낙찰결과를 쌓을수록 정확해진다")
+        self.empirical = len(ratios) >= wc["min_cases"]
+        self.gap_quantiles = wc["failed_gap_quantiles"]
         self.no_bid_curve = wc["no_bid_curve"]
 
     def cdf(self, ratio):
@@ -95,10 +97,20 @@ class WinModel:
     def no_bid_prob(self, min_price, mv):
         return min(max(_interp(self.no_bid_curve, min_price / mv), 0.0), 1.0)
 
-    def prob(self, bid, min_price, mv):
+    def describe(self, prev_min):
+        if prev_min and not self.empirical:
+            return ("유찰 물건 기본 가정 (직전 회차 최저가 근처에서 낙찰되는 경향) — "
+                    f"지역 낙찰사례 {self.case_count}건, record 로 쌓을수록 정확해진다")
+        return self.source
+
+    def prob(self, bid, min_price, mv, prev_min=None):
         if bid < min_price:
             return 0.0
         p_none = self.no_bid_prob(min_price, mv)
+        if prev_min and prev_min > min_price and not self.empirical:
+            g = (bid - min_price) / (prev_min - min_price)
+            f = _interp([(v, q) for q, v in self.gap_quantiles], g)
+            return p_none + (1 - p_none) * min(max(f, 0.0), 1.0)
         f_min = self.cdf(min_price / mv)
         if f_min >= 1.0:
             return 1.0
