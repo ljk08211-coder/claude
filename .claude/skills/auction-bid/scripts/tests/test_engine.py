@@ -153,6 +153,21 @@ class TestEngine(unittest.TestCase):
         self.assertTrue(240_000_000 <= mv["value"] <= 265_000_000, mv["value"])
         self.assertTrue(any("이상거래" in n for n in mv["notes"]))  # 1.5억 직거래 제외
 
+    def test_exact_name_beats_substring(self):
+        rows = [{"apt_name": "현대", "dong": "좌동"}, {"apt_name": "현대카멜리아", "dong": "좌동"}]
+        same = market.apt_matcher({"apt_name": "현대", "dong": "좌동"}, rows)
+        self.assertTrue(same(rows[0]))
+        self.assertFalse(same(rows[1]))  # 실데이터에서 잡힌 버그: 부분 일치로 다른 단지가 섞였다
+        same = market.apt_matcher({"apt_seq": "26350-138", "apt_name": "아무거나"}, rows)
+        self.assertTrue(same({"apt_seq": "26350-138", "apt_name": "현대", "dong": "좌동"}))
+
+    def test_two_far_apart_comps_do_not_crash(self):
+        case = base_case()
+        rows = [{"date": "2026-09-10", "apt_name": "해운대테스트", "dong": "좌동", "area": 84.9, "floor": 9,
+                 "build_year": 1997, "price": p, "dealing": "중개거래"} for p in (200_000_000, 300_000_000)]
+        mv = market.estimate(case, rows, self.cfg, TODAY)
+        self.assertIsNotNone(mv["value"])
+
     def test_low_confidence_takes_lowest(self):
         case = base_case()
         case["site_survey"]["asking_prices"] = [215_000_000, 230_000_000]

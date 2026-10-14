@@ -8,6 +8,7 @@ import csv
 import datetime as dt
 import io
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -17,6 +18,9 @@ TRADE_URLS = [
     "https://apis.data.go.kr/1613000/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade",
 ]
 RENT_URLS = ["https://apis.data.go.kr/1613000/RTMSDataSvcAptRent/getRTMSDataSvcAptRent"]
+
+
+_HTTP_ONLY = False
 
 
 class ApiError(RuntimeError):
@@ -36,17 +40,36 @@ def _num(text, cast=float, default=None):
         return default
 
 
+def exact_name(name):
+    """괄호까지 살린 단지명 (현대 ≠ 현대(1051-2))."""
+    return re.sub(r"\s|아파트", "", name or "").lower()
+
+
 def norm_name(name):
     name = re.sub(r"\(.*?\)", "", name or "")
     return re.sub(r"\s|아파트", "", name).lower()
+
+
+def _get(full_url):
+    with urllib.request.urlopen(full_url, timeout=30) as resp:
+        return resp.read().decode("utf-8", errors="replace")
 
 
 def _request(url, params, key):
     # 공공데이터포털은 인코딩 키/디코딩 키를 둘 다 준다. '%' 가 있으면 이미 인코딩된 키.
     enc_key = key if "%" in key else urllib.parse.quote(key, safe="")
     query = f"serviceKey={enc_key}&" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(f"{url}?{query}", timeout=30) as resp:
-        body = resp.read().decode("utf-8", errors="replace")
+    global _HTTP_ONLY
+    http_url = "http://" + url.split("://", 1)[1]
+    if _HTTP_ONLY:
+        body = _get(f"{http_url}?{query}")
+    else:
+        try:
+            body = _get(f"{url}?{query}")
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            # 일부 네트워크에서 apis.data.go.kr HTTPS 연결이 끊긴다. 이후로는 HTTP 로만 요청.
+            _HTTP_ONLY = True
+            body = _get(f"{http_url}?{query}")
     try:
         root = ET.fromstring(body)
     except ET.ParseError:
@@ -99,6 +122,7 @@ def parse_trade(it):
     return {
         "date": f"{y}-{m:02d}-{(d or 1):02d}",
         "apt_name": it.get("aptNm", ""),
+        "apt_seq": it.get("aptSeq", ""),
         "dong": it.get("umdNm", ""),
         "jibun": it.get("jibun", ""),
         "area": area,
@@ -117,6 +141,7 @@ def parse_rent(it):
     return {
         "date": f"{y}-{m:02d}-{(d or 1):02d}",
         "apt_name": it.get("aptNm", ""),
+        "apt_seq": it.get("aptSeq", ""),
         "dong": it.get("umdNm", ""),
         "area": area,
         "floor": _num(it.get("floor"), int),

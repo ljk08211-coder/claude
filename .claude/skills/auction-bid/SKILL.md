@@ -19,6 +19,13 @@ description: 부동산 경매(아파트) 물건의 적정 입찰가를 추천한
 python3 <스킬>/scripts/auction.py check
 ```
 
+API 키는 환경변수 `DATA_GO_KR_KEY` 또는 `auction-cases/config.toml` 에 둔다 (이 폴더는 git 에 올라가지 않는다).
+
+```toml
+[api]
+data_go_kr_key = "발급받은 일반 인증키"
+```
+
 `DATA_GO_KR_KEY: 없음` 이면 실거래가 자동 수집이 안 된다. 사용자에게 알려주고 셋 중 하나로 간다.
 - 공공데이터포털(data.go.kr)에서 **국토교통부_아파트 매매 실거래가 상세 자료**, **국토교통부_아파트 전월세 실거래가 자료** 활용신청 → 발급된 키를 `DATA_GO_KR_KEY` 환경변수에 설정 (무료, 승인 즉시~1시간)
 - rt.molit.go.kr 에서 해당 시군구 아파트 매매 CSV 를 받아 `--csv` 로 넣기
@@ -37,7 +44,7 @@ python3 <스킬>/scripts/auction.py init 2026타경12345
 |---|---|---|
 | `court`, `item_no` | 사건정보 | |
 | `property.region` | 주소 | "부산 해운대구"처럼. 같은 구 이름이 여러 도시에 있으면 도시를 붙인다. `lawd_cd`(5자리)를 알면 직접 넣어도 된다 |
-| `property.dong`, `apt_name` | 주소·감정평가서 | `dong` 은 법정동(예: 좌동, 우동). `apt_name` 은 실거래가에 나오는 단지명과 비슷하게 |
+| `property.dong`, `apt_name`, `apt_seq` | 주소·감정평가서 → 3단계 후 `apts` 로 확정 | `dong` 은 법정동(예: 좌동, 우동). 실거래 수집 뒤 `apts` 로 국토부 표기 단지명과 `apt_seq`(단지 고유번호)를 확인해서 넣는다 |
 | `property.exclusive_area` | 감정평가서 | **전용면적** ㎡ |
 | `property.floor`, `top_floor`, `build_year` | 감정평가서·건축물대장 | |
 | `auction.appraisal`, `min_price`, `failed_count`, `sale_date` | 사건정보 | 원 단위 정수 |
@@ -55,6 +62,15 @@ python3 <스킬>/scripts/auction.py comps auction-cases/2026타경12345/case.jso
 ```
 
 - `API_ERROR` → 키 승인 대기 중이거나 오류. CSV 나 직접 입력으로 계속 간다.
+- 한 구 12개월이면 매매 수천 건이라 1~2분 걸린다. HTTPS 가 막힌 네트워크면 자동으로 HTTP 로 다시 요청한다.
+
+수집이 끝나면 단지를 확정한다. 같은 이름 단지가 여러 개면(예: 현대, 현대(1051-2)) 주소의 법정동·준공연도·전용면적으로 고른다.
+
+```bash
+python3 <스킬>/scripts/auction.py apts auction-cases/2026타경12345/case.json 센텀대림
+```
+
+출력된 단지명 그대로 `apt_name`, 그리고 `apt_seq`, `dong` 을 case.json 에 넣는다.
 - `NO_DATA_SOURCE` → 1단계 안내로 돌아간다.
 
 ## 4단계: 현장조사 정보 (있으면)

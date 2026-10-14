@@ -3,7 +3,7 @@ import datetime as dt
 import statistics
 from collections import defaultdict
 
-from .molit import norm_name
+from .molit import exact_name, norm_name
 
 
 def _date(s):
@@ -12,6 +12,18 @@ def _date(s):
 
 def _months_between(a, b):
     return (b.year - a.year) * 12 + (b.month - a.month)
+
+
+def apt_matcher(prop, rows):
+    """같은 단지 판정. 단지 고유번호(apt_seq) → 정확한 단지명 → (그래도 없으면) 부분 일치 순서."""
+    seq, dong = prop.get("apt_seq"), prop.get("dong", "")
+    if seq:
+        return lambda t: t.get("apt_seq") == seq
+    exact, loose = exact_name(prop.get("apt_name", "")), norm_name(prop.get("apt_name", ""))
+    in_dong = lambda t: not dong or t["dong"] == dong
+    if exact and any(exact_name(t["apt_name"]) == exact and in_dong(t) for t in rows):
+        return lambda t: exact_name(t["apt_name"]) == exact and in_dong(t)
+    return lambda t: bool(loose) and (loose in norm_name(t["apt_name"]) or norm_name(t["apt_name"]) in loose) and in_dong(t)
 
 
 def regional_index(trades, today):
@@ -60,7 +72,8 @@ def _weighted_median(pairs):
 
 
 def _recency_weight(months_ago):
-    return 1.0 if months_ago <= 3 else 0.7 if months_ago <= 6 else 0.5
+    # 해운대구 실거래 백테스트에서 최근 거래를 강하게 반영할 때 오차가 가장 작았다
+    return 1.0 if months_ago <= 1 else 0.6 if months_ago <= 3 else 0.3 if months_ago <= 6 else 0.15
 
 
 def estimate(case, trades, cfg, today=None):
@@ -68,7 +81,6 @@ def estimate(case, trades, cfg, today=None):
     mc = cfg["market"]
     prop = case["property"]
     area = float(prop["exclusive_area"])
-    target_name = norm_name(prop.get("apt_name", ""))
     target_dong = prop.get("dong", "")
     target_floor_adj = floor_adj(prop.get("floor"), prop.get("top_floor"), cfg)
     by = prop.get("build_year")
@@ -76,10 +88,7 @@ def estimate(case, trades, cfg, today=None):
     recent = [t for t in trades if _months_between(_date(t["date"]), today) <= mc["comp_months"]]
     index = regional_index(trades, today)
 
-    def same_apt(t):
-        n = norm_name(t["apt_name"])
-        name_ok = bool(target_name) and (target_name in n or n in target_name)
-        return name_ok and (not target_dong or t["dong"] == target_dong)
+    same_apt = apt_matcher(prop, trades)
 
     tiers = [
         ("같은 단지·같은 평형", 1.0, lambda t: same_apt(t) and abs(t["area"] - area) <= mc["same_type_area_tol"]),
@@ -109,6 +118,9 @@ def estimate(case, trades, cfg, today=None):
     if comps:
         med = statistics.median(c["adjusted"] for c in comps)
         kept = [c for c in comps if abs(c["adjusted"] / med - 1) <= mc["outlier_band"]]
+        if not kept:  # 사례가 적고 서로 멀면 전부 걸러질 수 있다 → 걸러내지 않고 신뢰도로 경고
+            kept = comps
+            result["notes"].append("비교사례 가격이 서로 크게 달라 이상거래를 걸러내지 못함")
         dropped = len(comps) - len(kept)
         if dropped:
             result["notes"].append(f"이상거래 {dropped}건 제외 (중앙값 ±{mc['outlier_band']:.0%} 밖)")
@@ -160,13 +172,14 @@ def rent_estimate(case, rents, market_value, cfg, today=None):
         return None
     prop = case["property"]
     area = float(prop["exclusive_area"])
-    name, dong = norm_name(prop.get("apt_name", "")), prop.get("dong", "")
+    dong = prop.get("dong", "")
     conv = cfg["market"]["rent_conversion_rate"]
     base_deposit = round(market_value * 0.1, -6)
     recent = [r for r in rents if r["monthly_rent"] > 0
               and _months_between(_date(r["date"]), today) <= 12
               and abs(r["area"] - area) <= area * 0.1]
-    for label, pick in (("같은 단지", lambda r: name and name in norm_name(r["apt_name"])),
+    same = apt_matcher(prop, rents)
+    for label, pick in (("같은 단지", same),
                         ("같은 동네", lambda r: r["dong"] == dong)):
         rows = [r for r in recent if pick(r)]
         if len(rows) >= 3:

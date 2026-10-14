@@ -5,6 +5,7 @@
   python auction.py check
   python auction.py init <사건번호> [--out auction-cases]
   python auction.py comps <case.json> [--months 12] [--csv 실거래.csv ...]
+  python auction.py apts <case.json> <단지명 일부>     (comps.json 에서 단지명·apt_seq 확인)
   python auction.py analyze <case.json> [--config 내설정.toml]   (기본: auction-cases/config.toml 이 있으면 덮어씀)
   python auction.py record <case.json> --winning-bid 원 [--bidders N] [--my-bid 원]
   python auction.py record-comp --lawd 26350 --market-value 원 --winning-bid 원 [--sale-date YYYY-MM-DD] ...
@@ -27,8 +28,12 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 TEMPLATE = SKILL_DIR / "templates" / "case_template.json"
 
 
-def _key():
-    return os.environ.get("DATA_GO_KR_KEY", "").strip()
+def _key(data_dir="auction-cases"):
+    """환경변수 DATA_GO_KR_KEY, 없으면 auction-cases/config.toml 의 [api] data_go_kr_key."""
+    key = os.environ.get("DATA_GO_KR_KEY", "").strip()
+    if key:
+        return key
+    return str(config.load(Path(data_dir) / "config.toml").get("api", {}).get("data_go_kr_key", "")).strip()
 
 
 def _results_path(case_path):
@@ -84,12 +89,13 @@ def cmd_comps(a):
         rows = molit.load_csv(path)
         data["trades"] += rows
         data["sources"].append(f"CSV {Path(path).name} ({len(rows)}건)")
-    if _key() and not a.no_api:
+    key = _key(Path(a.case).resolve().parent.parent)
+    if key and not a.no_api:
         print(f"실거래가 API 조회: {data['region']} 최근 {a.months}개월")
         try:
-            data["trades"] += molit.fetch(lawd, a.months, _key(), "trade")
+            data["trades"] += molit.fetch(lawd, a.months, key, "trade")
             data["sources"].append("국토교통부 매매 실거래가 API")
-            data["rents"] += molit.fetch(lawd, 12, _key(), "rent")
+            data["rents"] += molit.fetch(lawd, 12, key, "rent")
             data["sources"].append("국토교통부 전월세 API")
         except Exception as e:  # 네트워크·키 오류여도 CSV/직접입력으로 계속 갈 수 있게
             print(f"API_ERROR: {e}")
@@ -98,6 +104,25 @@ def cmd_comps(a):
         return 2
     _save(out, data)
     print(f"저장: {out} (매매 {len(data['trades'])}건, 전월세 {len(data['rents'])}건)")
+    return 0
+
+
+def cmd_apts(a):
+    """comps.json 에서 단지 찾기 → case.json 에 넣을 apt_name·apt_seq·dong 확인용."""
+    comps = _load(Path(a.case).parent / "comps.json")
+    q = molit.norm_name(a.query)
+    groups = {}
+    for t in comps["trades"]:
+        if q and q not in molit.norm_name(t["apt_name"]):
+            continue
+        g = groups.setdefault((t.get("apt_seq", ""), t["apt_name"], t["dong"]), {"n": 0, "areas": set(), "by": t["build_year"]})
+        g["n"] += 1
+        g["areas"].add(round(t["area"], 1))
+    if not groups:
+        print(f"'{a.query}' 가 들어간 단지가 없다. 이름 일부만 넣어보거나 법정동을 확인해줘.")
+        return 2
+    for (seq, name, dong), g in sorted(groups.items(), key=lambda kv: -kv[1]["n"]):
+        print(f"{name} | apt_seq={seq} | {dong} | 준공 {g['by']} | 거래 {g['n']}건 | 전용 {', '.join(map(str, sorted(g['areas'])))}")
     return 0
 
 
@@ -175,6 +200,9 @@ def main():
     s.add_argument("--months", type=int, default=12)
     s.add_argument("--csv", nargs="*")
     s.add_argument("--no-api", action="store_true")
+    s = sub.add_parser("apts")
+    s.add_argument("case")
+    s.add_argument("query")
     s = sub.add_parser("analyze")
     s.add_argument("case")
     s.add_argument("--config")
@@ -197,7 +225,7 @@ def main():
     s.add_argument("--type", default="아파트")
     s.add_argument("--out", default="auction-cases")
     a = p.parse_args()
-    handlers = {"check": cmd_check, "init": cmd_init, "comps": cmd_comps, "analyze": cmd_analyze,
+    handlers = {"check": cmd_check, "init": cmd_init, "comps": cmd_comps, "apts": cmd_apts, "analyze": cmd_analyze,
                 "record": cmd_record, "record-comp": cmd_record_comp}
     try:
         return handlers[a.cmd](a)
