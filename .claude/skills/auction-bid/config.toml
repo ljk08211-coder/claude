@@ -1,0 +1,94 @@
+# 경매 입찰가 추천 설정
+# 숫자는 본인 기준으로 바꿔 쓰면 된다. 세율·대출 규제는 자주 바뀌므로 입찰 전 확인할 것.
+# 리포트에 이 기준일이 같이 찍힌다.
+basis_date = "2026-10-14"
+
+[investor]
+houses_owned = 0          # 낙찰 전 보유 주택 수 (무주택 = 0)
+will_reside = false       # 낙찰 물건에 실거주할지 (조정대상지역 비과세 요건: 2년 거주)
+first_home_reduction = false  # 생애최초 취득세 감면(최대 200만). 받으면 3년 내 매도·임대 시 추징 → 매도차익 전략이면 false
+
+[strategy]
+primary = "flip"                  # flip = 매도차익, rent = 임대수익
+target_net_profit = 20_000_000    # 매도차익: 세후 순이익 목표 (원)
+target_rent_yield = 0.08          # 임대수익: 실투자금 대비 연 순수익률 목표
+hold_scenarios_years = [0.5, 1.0, 2.0]   # 비교할 보유기간
+sale_discount = 0.02              # 빨리 팔기 위해 시세보다 낮춰 파는 비율
+annual_price_growth = 0.0         # 보유기간 동안 시세 상승 기대 (보수적으로 0)
+months_to_possession = 3          # 낙찰 → 잔금 → 명도 완료까지 개월 (이 기간에도 이자 발생)
+vacancy_months = 2                # 수리·매도/임대 준비로 비는 개월
+rent_during_hold = true           # 1년 이상 보유 시나리오에서 월세 수입 반영
+
+[loan]
+# 경락잔금대출 = min(낙찰가 × ltv_of_bid, 감정가 × ltv_of_appraisal)
+# 규제지역(조정대상지역 등)은 LTV가 크게 낮다. 실제 한도는 대출상담사에게 꼭 확인.
+rate = 0.045
+ltv_of_bid = 0.8
+ltv_of_appraisal = 0.7
+regulated_ltv_of_bid = 0.4
+regulated_ltv_of_appraisal = 0.4
+
+[costs]
+legal_fee_rate = 0.004            # 법무비·등기비·채권할인 (낙찰가 대비)
+legal_fee_min = 500_000
+auction_exec_cost_rate = 0.005    # 배당 시뮬레이션용 경매집행비용 (낙찰가 대비)
+mgmt_fee_common_ratio = 0.6       # 체납관리비 중 낙찰자가 떠안는 공용부분 비율
+monthly_upkeep = 200_000          # 공실 기간 관리비·공과금 (월)
+annual_holding_tax_rate = 0.0015  # 재산세 등 보유세 (시세 대비, 연)
+broker_vat = 0.1                  # 중개보수 부가세
+capex_ratio = 0.5                 # 수리비 중 양도세 필요경비로 인정되는 비율 (섀시·확장 등 자본적지출)
+supply_area_ratio = 1.3           # 공급면적 ≈ 전용면적 × 이 값 (수리비 평당 계산용)
+unknown_condition_grade = "C"     # 내부를 못 봤을 때 가정할 컨디션
+
+[costs.repair_per_pyeong]         # 공급 평당 수리 단가
+A = 100_000      # 거의 손볼 것 없음 (청소·소모품)
+B = 400_000      # 도배·장판·조명 + 부분 수리
+C = 1_000_000    # 욕실·주방 포함 수리
+D = 1_700_000    # 올수리 (섀시·확장 포함)
+
+[costs.eviction]                  # 명도비 (이사비·소송 대비)
+vacant = 500_000
+owner = 3_000_000
+tenant_paid = 1_000_000           # 배당 전액 받는 임차인 (명도확인서가 필요해서 협조적)
+tenant_partial = 3_000_000
+tenant_unpaid = 5_000_000
+unknown = 3_000_000
+
+[market]
+comp_months = 12          # 실거래 비교 기간
+min_comps = 3
+same_type_area_tol = 3.0  # 같은 평형으로 보는 전용면적 차이 (㎡)
+area_tolerance = 0.10     # 유사 평형 (±10%)
+build_year_tolerance = 5  # 인근 유사단지 연식 차이
+outlier_band = 0.15       # 중앙값 대비 ±15% 밖은 이상거래로 제외
+low_confidence_spread = 0.10   # 실거래·KB·호가 차이가 이 이상이면 신뢰도 낮음 → 가장 낮은 값 사용
+rent_conversion_rate = 0.06    # 전월세 전환율 (보증금 ↔ 월세 환산)
+
+[market.floor_adjust]
+"1" = -0.07
+"2" = -0.04
+top = -0.02
+
+[winprob]
+lookback_months = 6
+min_cases = 8             # 지역 낙찰사례가 이보다 적으면 아래 기본 분포 사용
+# 낙찰가 ÷ 시세 분포 (임시 기본값). 낙찰결과를 record 로 쌓으면 실제 분포로 대체된다.
+default_quantiles = [[0.0, 0.70], [0.10, 0.78], [0.25, 0.84], [0.50, 0.88], [0.75, 0.92], [0.90, 0.96], [1.0, 1.05]]
+# (최저가 ÷ 시세) → 아무도 입찰 안 할(유찰) 확률
+no_bid_curve = [[0.75, 0.03], [0.85, 0.15], [0.95, 0.45], [1.05, 0.75]]
+reduction_rate = 0.2      # 유찰 시 최저가 저감률 (대부분 20%, 일부 법원 30% — 사건에서 확인)
+deposit_rate = 0.1
+resale_deposit_rate = 0.2
+
+[recommend]
+step = 100_000
+conservative_ev_ratio = 0.8   # 보수안: 추천안 기대수익의 80% 이상을 지키는 가장 낮은 가격
+odd_tail = 70_000         # 딱 떨어지는 금액을 피하는 끝자리 (예: 2억3,100만 → 2억3,107만)
+
+[regions]
+# 조정대상지역 (2025.10.15 대책 기준: 서울 전역 + 경기 12곳). 바뀌면 여기만 고친다.
+regulated_prefixes = ["11"]
+regulated_codes = ["41290", "41210", "41131", "41133", "41135", "41111", "41115", "41117", "41173", "41465", "41430", "41450"]
+
+[tax]
+multi_home_cgt_surcharge = true   # 조정지역 다주택 양도세 중과 (유예 연장 여부 확인 필요)

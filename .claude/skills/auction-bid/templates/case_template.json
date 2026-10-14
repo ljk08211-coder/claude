@@ -1,0 +1,44 @@
+{
+  "case_no": "2026타경00000",
+  "court": "부산지방법원",
+  "item_no": 1,
+  "property": {
+    "type": "아파트",
+    "region": "부산 해운대구",
+    "lawd_cd": "",
+    "address": "",
+    "dong": "",
+    "apt_name": "",
+    "exclusive_area": 0,
+    "floor": null,
+    "top_floor": false,
+    "build_year": null
+  },
+  "auction": {
+    "appraisal": 0,
+    "min_price": 0,
+    "failed_count": 0,
+    "sale_date": "",
+    "resale": false,
+    "reduction_rate": null,
+    "special_conditions": ""
+  },
+  "occupancy": { "type": "unknown" },
+  "rights": [],
+  "tenants": [],
+  "flags": [],
+  "notes": "",
+  "site_survey": {
+    "condition_grade": null,
+    "repair_cost_override": null,
+    "unpaid_mgmt_fee": 0,
+    "kb_price": null,
+    "asking_prices": [],
+    "notes": ""
+  },
+  "overrides": {
+    "market_value": null,
+    "monthly_rent": null,
+    "rent_deposit": null
+  }
+}
