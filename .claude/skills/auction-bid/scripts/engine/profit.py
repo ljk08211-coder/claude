@@ -24,10 +24,19 @@ class Deal:
         survey = case.get("site_survey") or {}
         grade = (survey.get("condition_grade") or c["unknown_condition_grade"]).upper()
         self.condition_grade = grade
+        build_year = prop.get("build_year")
+        basis_year = int(str(cfg.get("basis_date", "2026"))[:4])
+        self.new_building = bool(build_year) and basis_year - int(build_year) <= c.get("new_building_years", -1)
         if survey.get("repair_cost_override") is not None:
             self.repair = int(survey["repair_cost_override"])
+        elif self.new_building:
+            self.condition_grade = f"준공 {build_year}년(10년 이내) — 도배·청소만"
+            self.repair = int(c["new_building_repair"])
         else:
             self.repair = round(self.area * c["supply_area_ratio"] / PYEONG * c["repair_per_pyeong"][grade], -4)
+        op = prop.get("official_price")
+        self.official_price = int(op) if op else round(market_value * cfg["tax"].get("official_price_ratio", 0.69), -6)
+        self.official_price_estimated = not op
         self.mgmt = round(int(survey.get("unpaid_mgmt_fee") or 0) * c["mgmt_fee_common_ratio"], -4)
 
     def rights(self, bid):
@@ -49,6 +58,13 @@ class Deal:
         assumed = r["assumed_amount"]
         acq = taxes.acquisition_tax(bid + assumed, self.area, self.houses_after, self.regulated,
                                     self.cfg["investor"]["first_home_reduction"])
+        acq_legal = acq["total"]
+        tc = self.cfg["tax"]
+        if tc.get("acquisition_rate"):
+            base = bid + assumed
+            if tc.get("acquisition_base") == "official_price":
+                base = self.official_price
+            acq = {"total": round(base * tc["acquisition_rate"]), "rate": tc["acquisition_rate"]}
         legal = max(bid * c["legal_fee_rate"], c["legal_fee_min"])
         eviction = c["eviction"][r["eviction_type"]]
         items = {
@@ -61,13 +77,13 @@ class Deal:
             "체납관리비(공용)": self.mgmt,
         }
         loan = self.loan(bid)
-        return {"items": items, "total": sum(items.values()), "loan": round(loan, -4),
+        return {"items": items, "total": sum(items.values()), "loan": round(loan, -4), "acq_legal": acq_legal,
                 "acq_tax_rate": acq["rate"], "rights": r}
 
     def flip(self, bid, hold_years):
         s, c, inv = self.cfg["strategy"], self.cfg["costs"], self.cfg["investor"]
         a = self.acquisition(bid)
-        months_total = hold_years * 12 + s["months_to_possession"]
+        months_total = self.cfg["loan"].get("interest_months") or hold_years * 12 + s["months_to_possession"]
         interest = a["loan"] * self.cfg["loan"]["rate"] * months_total / 12
         holding_tax = self.mv * c["annual_holding_tax_rate"] * hold_years
         upkeep = c["monthly_upkeep"] * s["vacancy_months"]

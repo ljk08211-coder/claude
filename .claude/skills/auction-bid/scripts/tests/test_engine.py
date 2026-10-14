@@ -224,6 +224,24 @@ class TestEngine(unittest.TestCase):
     def test_other_income_raises_business_tax(self):
         self.assertGreater(taxes.business_income_tax(30_000_000, 50_000_000), taxes.business_income_tax(30_000_000))
 
+    def test_interest_fixed_months_and_official_price_tax(self):
+        deal = Deal(base_case(), self.cfg, 250_000_000)
+        f = deal.flip(180_000_000, 0.33)
+        loan = deal.loan(180_000_000)
+        self.assertEqual(f["costs"]["대출이자"], round(loan * 0.051 * 4 / 12, -4))
+        self.assertEqual(deal.official_price, round(250_000_000 * 0.69, -6))  # 공시가격 없으면 추정
+        self.assertEqual(f["costs"]["취득세 등"], round(deal.official_price * 0.01))
+        case = base_case()
+        case["property"]["official_price"] = 160_000_000
+        self.assertEqual(Deal(case, self.cfg, 250_000_000).flip(180_000_000, 0.33)["costs"]["취득세 등"], 1_600_000)
+
+    def test_new_building_only_wallpaper_and_cleaning(self):
+        case = base_case()
+        case["property"]["build_year"] = 2017
+        self.assertEqual(Deal(case, self.cfg, 250_000_000).repair, 1_500_000)
+        case["property"]["build_year"] = 2015
+        self.assertGreater(Deal(case, self.cfg, 250_000_000).repair, 1_500_000)
+
     def test_user_cost_settings(self):
         deal = Deal(base_case(), self.cfg, 250_000_000)
         f = deal.flip(180_000_000, 0.5)

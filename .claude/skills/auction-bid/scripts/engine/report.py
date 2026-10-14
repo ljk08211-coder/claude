@@ -37,6 +37,10 @@ def korean_amount(n):
     return "".join(parts) + "원"
 
 
+def hold_label(years):
+    return f"{round(years * 12)}개월" if years < 1 else f"{years:g}년"
+
+
 def pct(x):
     return "-" if x is None else f"{x:.0%}"
 
@@ -160,7 +164,7 @@ def html_report(case, mv, rec, cfg):
     scen = ""
     for s in rec["scenarios"]:
         a = s["at_max"] or s["at_min"]
-        scen += (f"<tr><td>{s['hold_years']:g}년</td><td>{eok(s['max_bid'])}</td>"
+        scen += (f"<tr><td>{hold_label(s['hold_years'])}</td><td>{eok(s['max_bid'])}</td>"
                  f"<td>{eok(s['at_min'].get('net_pretax'))} / {eok(s['at_min']['net_profit'])}</td><td>{e(a['cgt_reason'])}</td>"
                  f"<td>{eok(s['at_min']['cash_needed'])}</td></tr>")
 
@@ -168,6 +172,15 @@ def html_report(case, mv, rec, cfg):
     best_s = max(rec["scenarios"], key=lambda s: s["max_bid"] or 0)
     from .profit import Deal
     detail = Deal(case, cfg, mv["value"], rec["rental"]["rent"]).flip(main_bid, best_s["hold_years"])
+    deal = Deal(case, cfg, mv["value"], rec["rental"]["rent"])
+    acq = deal.acquisition(main_bid)
+    tc = cfg["tax"]
+    if tc.get("acquisition_rate") and tc.get("acquisition_base") == "official_price":
+        acq_note = (f"취득세: 공시가격 {eok(deal.official_price)}"
+                    + (" (시세×" + f"{tc.get('official_price_ratio', 0.69):.0%} 추정 — 감정평가서·공시가격알리미 값으로 바꾸면 정확)" if deal.official_price_estimated else "")
+                    + f" × {tc['acquisition_rate']:.1%}. 참고로 법정 과세표준(낙찰가) 기준이면 {eok(acq['acq_legal'])}")
+    else:
+        acq_note = f"취득세: 법정 기준 {eok(acq['acq_legal'])}"
     cost_rows = "".join(f"<tr><td>{e(k)}</td><td>{won(val)}</td></tr>" for k, val in detail["costs"].items())
     cost_rows += (f"<tr><td><b>매도가</b></td><td><b>{won(detail['sale_price'])}</b></td></tr>"
                   f"<tr><td>보유 중 월세 수입</td><td>{won(detail['rent_income'])}</td></tr>"
@@ -228,9 +241,11 @@ def html_report(case, mv, rec, cfg):
 <div class="sub">목표 {rec.get('basis_label', '세후')} 순이익 {eok(cfg['strategy']['target_net_profit'])} · 취득 후 {cfg['investor']['houses_owned'] + 1}주택 기준
  · {'부동산매매사업자 (종합소득세)' if cfg['investor'].get('seller_type') == 'business' else '개인 양도 (양도소득세)'} · 대출금리 {cfg['loan']['rate']:.1%}</div></div>
 
-<h2>추천가 기준 손익 상세 ({best_s['hold_years']:g}년 보유 후 매도)</h2>
+<h2>추천가 기준 손익 상세 ({hold_label(best_s['hold_years'])} 보유 후 매도)</h2>
 <div class="card scroll"><table>{cost_rows}</table>
-<div class="sub">컨디션 {e(rec['condition_grade'])}등급 가정 수리비 {eok(rec['repair'])}</div></div>
+<div class="sub">수리비 {eok(rec['repair'])}: {e(rec['condition_grade'])}{'' if '준공' in rec['condition_grade'] else '등급 가정'}</div>
+<div class="sub">{e(acq_note)}</div>
+<div class="sub">대출이자 {cfg['loan'].get('interest_months') or '보유기간+명도기간'}개월 · 연 {cfg['loan']['rate']:.1%}</div></div>
 
 <h2>임대수익 (차선 전략)</h2><div class="card">{rent_html}</div>
 

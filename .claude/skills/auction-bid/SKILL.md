@@ -46,7 +46,8 @@ python3 <스킬>/scripts/auction.py init 2026타경12345
 | `property.region` | 주소 | "부산 해운대구"처럼. 같은 구 이름이 여러 도시에 있으면 도시를 붙인다. `lawd_cd`(5자리)를 알면 직접 넣어도 된다 |
 | `property.dong`, `apt_name`, `apt_seq` | 주소·감정평가서 → 3단계 후 `apts` 로 확정 | `dong` 은 법정동(예: 좌동, 우동). 실거래 수집 뒤 `apts` 로 국토부 표기 단지명과 `apt_seq`(단지 고유번호)를 확인해서 넣는다 |
 | `property.exclusive_area` | 감정평가서 | **전용면적** ㎡ |
-| `property.floor`, `top_floor`, `build_year` | 감정평가서·건축물대장 | |
+| `property.floor`, `top_floor`, `build_year` | 감정평가서·건축물대장 | 준공 10년 이내면 수리비 대신 도배·청소비(150만)만 잡힌다 |
+| `property.official_price` | 감정평가서·부동산공시가격알리미 | 공동주택 공시가격. 취득세(공시가격 × 1%) 계산용. 없으면 시세×69% 로 추정 |
 | `auction.appraisal`, `min_price`, `failed_count`, `sale_date` | 사건정보 | 원 단위 정수 |
 | `auction.resale`, `share_sale`, `special_conditions` | 매각물건명세서 | 재매각이면 `resale` true. 일부 지분만 파는 경우만 `share_sale` true (공유자 "지분 전부"를 함께 팔면 건물 전체라 false). 특별매각조건·인수 조건 원문 |
 | `auction.reduction_rate` | 법원 | 유찰 저감률. 모르면 null(기본 20%) |

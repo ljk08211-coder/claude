@@ -50,7 +50,8 @@ def run(case, cfg, market_value, rent, results, today=None):
         key = profit_key(cfg)
         profit_of = lambda b: deal.flip(b, hold)[key]
         after_tax_of = lambda b: deal.flip(b, hold)["net_profit"]
-        primary_label = f"매도차익 ({hold:g}년 보유)" if max_bid else "매도차익"
+        hold_txt = f"{round(hold * 12)}개월" if hold < 1 else f"{hold:g}년"
+        primary_label = f"매도차익 ({hold_txt} 보유)" if max_bid else "매도차익"
 
     resale = bool(auc.get("resale"))
     deposit = round(min_price * cfg["winprob"]["resale_deposit_rate" if resale else "deposit_rate"])
