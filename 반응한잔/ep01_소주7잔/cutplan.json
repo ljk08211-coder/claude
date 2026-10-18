@@ -1,0 +1,193 @@
+{
+  "title": "외국 바텐더들이 소주 7잔 마시고 마지막에 질색한 이유",
+  "source": {
+    "url": "https://www.youtube.com/watch?v=ujDmLbXuYBI",
+    "credit": "Source: Queen Bee Mixology"
+  },
+  "voice": "Charon",
+  "segments": [
+    {
+      "id": "s01",
+      "kind": "src",
+      "clip": "c01",
+      "in": "06:09.0",
+      "out": "06:12.0",
+      "audio": "source",
+      "anchor": 0.42,
+      "label": "훅 - 오리지널 마시고 피터 \"NO!\"",
+      "big": "7번째 잔에서…",
+      "subs": [
+        [
+          "0.0",
+          "1.4",
+          "Nope.",
+          "아니."
+        ],
+        [
+          "1.4",
+          "3.0",
+          "No!",
+          "아니야!"
+        ]
+      ]
+    },
+    {
+      "id": "s02",
+      "kind": "me",
+      "clip": "me01",
+      "label": "바텐더 인트로 (바 카운터)",
+      "narr": "미국 바텐더 넷이 소주를 처음 마셔봅니다. 일곱 잔, 끝까지 갈 수 있을까요?"
+    },
+    {
+      "id": "s03",
+      "kind": "src",
+      "clip": "c02",
+      "in": "01:38.5",
+      "out": "01:42.5",
+      "audio": "source",
+      "anchor": 0.5,
+      "label": "1잔 자몽 - 이거 술 맞아?",
+      "subs": [
+        [
+          "0.0",
+          "1.8",
+          "Yum, that's refreshing.",
+          "음~ 상쾌한데?"
+        ],
+        [
+          "1.8",
+          "4.0",
+          "Is there actually alcohol in it?",
+          "잠깐, 이거 진짜 술 맞아?"
+        ]
+      ]
+    },
+    {
+      "id": "s04",
+      "kind": "src",
+      "clip": "c03",
+      "in": "04:07.5",
+      "out": "04:13.0",
+      "audio": "source",
+      "anchor": 0.45,
+      "label": "4잔 청사과 - 애플 마티니, 한 박스 사갈래",
+      "subs": [
+        [
+          "0.0",
+          "2.4",
+          "Like an apple martini!",
+          "완전 애플 마티니야!"
+        ],
+        [
+          "2.4",
+          "5.5",
+          "Am I taking a case of this home?",
+          "이거 한 박스 집에 가져가도 돼?"
+        ]
+      ]
+    },
+    {
+      "id": "s05",
+      "kind": "me",
+      "clip": "me02",
+      "gfx": "abv",
+      "label": "바텐더 해석 1 - 과일소주는 칵테일, 도수는 와인급",
+      "narr": "바텐더로서 한마디. 애플 마티니 맞아요. 과일소주는 거의 칵테일인데, 도수는 와인급 12도. 주스처럼 마시면 훅 갑니다."
+    },
+    {
+      "id": "s06",
+      "kind": "src",
+      "clip": "c04",
+      "in": "04:32.5",
+      "out": "04:36.5",
+      "audio": "source",
+      "anchor": 0.6,
+      "label": "5잔째 - 따르다 쏟음",
+      "subs": [
+        [
+          "0.0",
+          "1.8",
+          "Are you kidding me?",
+          "장난해?"
+        ],
+        [
+          "1.8",
+          "4.0",
+          "Don't ever let me pour.",
+          "나한테 따르게 하지 마…"
+        ]
+      ]
+    },
+    {
+      "id": "s07",
+      "kind": "src",
+      "clip": "c05",
+      "in": "04:46.5",
+      "out": "04:50.0",
+      "audio": "source",
+      "anchor": 0.25,
+      "label": "5잔째 - 켈리 주량 허세",
+      "subs": [
+        [
+          "0.0",
+          "3.5",
+          "I can drink you guys under the table!",
+          "너희 다 테이블 밑으로 보내줄 수 있어!"
+        ]
+      ]
+    },
+    {
+      "id": "s08",
+      "kind": "gfx",
+      "gfx": "shot7",
+      "label": "전환 - 대망의 7번째 오리지널",
+      "narr": "다섯 잔에 벌써 허세. 그리고 대망의 일곱 번째, 오리지널."
+    },
+    {
+      "id": "s09",
+      "kind": "src",
+      "clip": "c06",
+      "in": "06:07.0",
+      "out": "06:15.0",
+      "audio": "source",
+      "anchor": 0.45,
+      "label": "하이라이트 - 오리지널 원샷 전원 질색",
+      "subs": [
+        [
+          "0.0",
+          "2.0",
+          "Cheers.",
+          "건배."
+        ],
+        [
+          "2.0",
+          "4.6",
+          "Nope. No!",
+          "아니, 아니야!"
+        ],
+        [
+          "4.6",
+          "8.0",
+          "That is like taking a shot of alcohol.",
+          "이건 그냥 알코올 원샷이잖아."
+        ]
+      ]
+    },
+    {
+      "id": "s10",
+      "kind": "me",
+      "clip": "me03",
+      "gfx": "order",
+      "label": "바텐더 해석 2 - 순서가 거꾸로",
+      "narr": "당연하죠. 단 거 여섯 잔 뒤에 오리지널이면 쓸 수밖에요. 한국에선 반대예요. 오리지널 먼저, 안주 한 입, 과일소주는 디저트!"
+    },
+    {
+      "id": "s11",
+      "kind": "gfx",
+      "gfx": "end",
+      "label": "엔딩 - 댓글 유도 + 다음 편",
+      "narr": "여러분 첫 잔은 오리지널? 과일? 다음 편은 막걸리입니다!"
+    }
+  ],
+  "tempo": 1.1
+}
