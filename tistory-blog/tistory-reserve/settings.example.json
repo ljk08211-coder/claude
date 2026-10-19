@@ -1,0 +1,20 @@
+{
+  "blog": "https://gwangtender.tistory.com",
+  "visibility": "private",
+  "pillars": ["술집 창업", "F&B 창업", "소상공인 지원금", "위스키", "칵테일", "전통주", "바텐더", "조주기능사"],
+  "categories": {},
+  "disclosure": "이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.",
+  "products": [
+    {
+      "name": "예시) 스테인리스 바 스푼 30cm",
+      "keywords": ["칵테일", "홈텐딩", "하이볼", "바스푼"],
+      "url": "https://link.coupang.com/a/XXXX",
+      "desc": "예시) 긴 잔에서도 바닥까지 저을 수 있는 길이",
+      "cta": "쿠팡에서 가격 보기"
+    }
+  ],
+  "footer": [
+    { "text": "영상으로 보고 싶다면 유튜브 '조선바텐더'", "url": "" },
+    { "text": "바결에서 직접 맛보기", "url": "" }
+  ]
+}
