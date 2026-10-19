@@ -19,12 +19,13 @@ description: "네이버 블로그·티스토리 원고를 쓰는 공통 절차. 
 eval(await fs.readFile('<this-skill-dir>/scripts/writer.js', 'utf8'));
 globalThis.KD = '<계정 폴더>/blog-knowledge';
 await fs.mkdir(KD, { recursive: true });
-try { console.log('지식 노트:', W.loadKnowledge(await fs.readFile(KD + '/knowledge.md', 'utf8'))); }
-catch (e) { await fs.writeFile(KD + '/knowledge.md', await fs.readFile('<this-skill-dir>/knowledge.example.md', 'utf8')); console.log('지식 노트 새로 만듦(비어 있음)'); }
+let kn = ''; try { kn = await fs.readFile(KD + '/knowledge.md', 'utf8'); } catch (e) {}
+if (!kn || !W.loadKnowledge(kn).length) { kn = await fs.readFile('<this-skill-dir>/knowledge.md', 'utf8'); await fs.writeFile(KD + '/knowledge.md', kn); console.log('지식 노트를 스킬 기본본(조선바텐더 영상 정리)으로 채움'); }
+console.log('지식 노트:', W.loadKnowledge(kn));
 try { W.applyBench(JSON.parse(await fs.readFile(KD + '/benchmark.json', 'utf8'))); } catch (e) {}
 ```
 
-지식 노트가 비어 있으면 경험 문장을 지어내지 않는다. 경험 섹션은 "바에서 자주 받는 질문" 형식의 일반론으로 쓰고, 보고 끝에 "이 주제 경험을 지식 노트에 적어 주시면 다음 글부터 반영돼요"라고 남긴다.
+지식 노트에 그 주제가 없으면 경험 문장을 지어내지 않는다. 그때 경험 섹션은 "바에서 자주 받는 질문" 형식의 일반론으로 쓰고, 보고 끝에 "이 주제 경험을 지식 노트에 적어 주시면 다음 글부터 반영돼요"라고 남긴다. 노트의 가격·매출·비용은 항목에 적힌 연도와 함께 쓴다("2022년 기준").
 
 ## 2. 조사와 브리프
 

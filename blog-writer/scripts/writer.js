@@ -115,7 +115,7 @@ globalThis.W = (() => {
   function knowledgeFor(text, n = 3) {
     const q = new Set(words(text));
     return KN.map((s) => ({ ...s, score: words(s.title + ' ' + s.body).filter((w) => q.has(w)).length + (words(s.title).some((w) => q.has(w)) ? 3 : 0) }))
-      .filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, n).map((s) => ({ title: s.title, body: s.body.slice(0, 600) }));
+      .filter((s) => s.score > 0).sort((a, b) => b.score - a.score).slice(0, n).map((s) => ({ title: s.title, body: s.body.slice(0, 900) }));
   }
 
   // ---- 브리프 ----
