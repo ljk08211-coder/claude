@@ -12,6 +12,8 @@ description: "티스토리 블로그 글을 상위 글 포맷·키워드 분석�
 - **한 번 실행에 최대 1편이다.** 티스토리는 짧은 시간에 여러 번 발행하면 보안 퍼즐(틀린그림찾기)을 띄운다. 퍼즐은 풀지 않는다. 우회도 계정 정지 사유라 하지 않는다.
 - **즉시 발행으로 넘어가지 않는다.** 예약 설정이 하나라도 확인되지 않으면 버튼을 누르지 않고 멈춘다.
 
+**진행 규칙 (가장 중요):** 1~5단계에서는 모든 응답이 repl 호출로 끝난다. 제목·분량·소제목 수 같은 계획을 글로 적지 않는다. "원고를 작성해 보겠습니다" 같은 예고도 쓰지 않는다. 같은 말을 다시 쓰려 하고 있으면 그 자리에서 멈추고 `console.log(JSON.stringify(TS.nextStep(blocks, R.blueprint, S)))`를 실행한 뒤, 결과의 code를 채워 바로 실행한다. 사용자에게 말하는 것은 사용자가 할 일이 있을 때(로그인·확인·오류)와 5단계 보고 때뿐이다.
+
 ## 0. 준비 (매 작업 처음)
 
 도우미와 설정 파일(6-1)을 불러오고 블로그를 정한다. 설정 파일이 아직 없으면 S는 빈 값이고, 블로그 주소는 사용자에게 물어본다.
@@ -37,7 +39,7 @@ globalThis.R = await TS.research('<키워드>');
 console.log(JSON.stringify({ checked: R.checked, picked: R.picked.map(p => ({ url: p.url, title: p.title, date: p.date, chars: p.chars, heads: p.heads, images: p.images, tags: p.tags })), blueprint: R.blueprint }, null, 1));
 ```
 
-원고를 쓰기 전에 사용자에게 보이는 답변에 설계도 표를 한 번 적는다: 고른 글(제목·url 3개), 제목 패턴과 길이(titleLength), 분량(targetChars자), 소제목(heads개)과 흐름(headExamples), 사진(photos장), 메인 키워드(mainKeywordTimes회 이상), keywords, tags.
+위 출력이 설계도다(사용자에게도 그대로 보인다). 따로 요약해 적지 않고 바로 2단계 코드를 실행한다.
 
 1. 따라 하는 것은 포맷과 키워드다. 문장은 새로 쓴다. checkDraft가 참고 글과 20자 이상 같은 문장을 막는다.
 2. 숫자(가격·도수·용량·지원 금액·신청 기간·시험 일정·합격률)는 R.picked[i].text나 공식 출처에서 확인한 것만 쓴다. 확인하지 못한 숫자·후기·개인 경험은 지어내지 않는다.
@@ -52,16 +54,17 @@ console.log(JSON.stringify({ checked: R.checked, picked: R.picked.map(p => ({ ur
 - 사진: 도입 문단 바로 아래에 1장(첫 사진이 대표 이미지가 된다), 나머지는 소제목 아래에 `[사진: 영어 키워드, 더 넓은 영어 키워드]` 한 줄. 예: `[사진: whisky tasting glass, whisky]`. 무료 사진은 영어로 검색해야 잘 나온다. 사진 자리는 blueprint.photos개.
 - 제품: 아래 "제품 카드" 규칙을 따른다.
 - 외부 주소·광고 문구·과장된 효능(숙취 해소, 건강 효과 등)은 본문에 쓰지 않는다. 술을 권하는 표현보다 정보·방법 중심으로 쓴다.
-- 원고 전체를 한 번에 쓰지 않는다. repl 한 번에 소제목 하나만 이어 붙인다. checkDraft가 실패해도 처음부터 다시 쓰지 않고 모자란 부분만 blocks.push로 더한다(한 번에 문단 3개 이하).
+- 원고 전체를 한 번에 쓰지 않는다. repl 한 번에 소제목 하나만 이어 붙인다. 앞 문단을 다시 쓰지 않는다.
+
+첫 호출에서 제목을 정하고 시작한다:
 
 ```js
-globalThis.blocks = globalThis.blocks || [];
-blocks.push('도입 2–3문장');              // 첫 호출만
-blocks.push('', '## 소제목 1', '문단', '[사진: english keyword, broader keyword]', '문단');
-console.log(TS.checkDraft(blocks, R.blueprint, S));
+globalThis.title = '<제목>';
+globalThis.blocks = [];
+console.log(JSON.stringify(TS.nextStep(blocks, R.blueprint, S)));
 ```
 
-ok가 true가 될 때까지 problems를 고친다. warnings는 고치면 좋지만 막지 않는다.
+그다음부터는 매번 nextStep 결과의 `next`(무엇을 쓸지)와 `code`(실행할 모양)를 따라 `<...>` 자리를 실제 문장으로 채워 **바로 실행한다**. 한 번 실행할 때마다 nextStep이 다음 할 일을 다시 알려 준다. `done: true`가 나오면 곧바로 3단계를 실행한다. problems는 막는 문제, warnings는 고치면 좋은 것이다.
 
 **제품 카드** (settings.json의 products에 사용자가 넣어 둔 제휴 링크만 쓴다. 링크를 지어내지 않는다)
 1. `console.log(TS.matchProducts(R.query + ' ' + blocks.join(' '), S))`로 이 글에 맞는 제품을 고른다(최대 2개).

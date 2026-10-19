@@ -549,6 +549,33 @@ globalThis.TS = (() => {
     return res;
   }
 
+  // 원고를 쓰는 동안 매번 부른다. 다음에 실행할 repl 코드 한 덩어리를 알려 준다.
+  // 무료 모델이 계획만 말로 되풀이하며 멈추는 것을 막으려고, '무엇을 쓸지'를 한 단계씩 좁혀 준다.
+  function nextStep(blocks, bp, settings = {}) {
+    const r = checkDraft(blocks, bp, settings);
+    const lines = blocks.map((b) => String(b || '').trim());
+    const heads = lines.filter((b) => /^## /.test(b));
+    const minHeads = Math.max(3, bp ? bp.heads : 3);
+    const kw = bp ? bp.mainKeyword : '메인 키워드';
+    const ex = bp ? Array.from(new Set([].concat(...(bp.headExamples || [])))).slice(0, 8).join(' / ') : '';
+    const photosNow = lines.filter((b) => /^\[사진/.test(b)).length;
+    const wantPhotos = bp ? bp.photos : 2;
+    const photoLine = photosNow < wantPhotos ? ", '[사진: english keyword, broader keyword]'" : '';
+    if (r.ok) return { done: true, next: '원고 완성. 지금 바로 3단계(TS.toHtml → TS.openEditor)를 실행하세요.', check: r };
+    let next, code;
+    if (!lines.filter(Boolean).length) {
+      next = '도입 문단을 넣으세요. 키워드 "' + kw + '"가 들어간 2~3문장 + 사진 줄 1개.';
+      code = "blocks.push('<도입 2~3문장>', '[사진: english keyword, broader keyword]');";
+    } else if (heads.length < minHeads) {
+      next = '소제목 ' + (heads.length + 1) + '/' + minHeads + '을 넣으세요. 소제목 1줄 + 문단 2~3개' + (photoLine ? ' + 사진 줄 1개' : '') + '. 이미 쓴 소제목: ' + (heads.map((h) => h.slice(3)).join(' / ') || '없음') + (ex ? '. 참고 글 소제목: ' + ex : '');
+      code = "blocks.push('', '## <소제목>', '<문단>', '<문단>'" + photoLine + ');';
+    } else {
+      next = '소제목 수는 채웠습니다. 남은 문제만 고치세요: ' + r.problems[0] + '. 앞 문단을 다시 쓰지 말고 새 문단을 더하세요.';
+      code = /사진/.test(r.problems[0]) ? "blocks.push('[사진: english keyword, broader keyword]');" : "blocks.push('<새 문단>', '<새 문단>');";
+    }
+    return { done: false, chars: r.chars, heads: heads.length + '/' + minHeads, problems: r.problems, next, code: code + '\nconsole.log(JSON.stringify(TS.nextStep(blocks, R.blueprint, S)));' };
+  }
+
   // ---- 자료 조사: 다음(Daum) 블로그 검색 상위의 티스토리 글을 읽어 포맷과 키워드를 뽑는다 ----
   const STOP = new Set(['그리고','하지만','그래서','이번','오늘','정말','진짜','바로','있는','있습니다','합니다','하는','해서','하면','이렇게','저는','제가','우리','여러분','그냥','너무','많이','다양한','통해','위해','대한','같은','경우','때문','부분','것을','것이','수가','하기','있어요','해요','입니다','글을','글이','글은','이제','그럼','관련','정도','가능','때문에','있다','한다','된다','있고','다른','사진','안녕하세요','티스토리','공감','댓글','구독','블로그']);
   const JOSA = /(으로|에서|까지|부터|처럼|보다|에게|한테|이랑|이나|이고|이며|이라|라고|하고|으로는|에서는|에는|은|는|이|가|을|를|에|의|와|과|도|만|로|요)$/;
@@ -685,6 +712,6 @@ globalThis.TS = (() => {
     return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()) + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes());
   }
 
-  return { SEL, MARK, use, checkLogin, openEditor, fillTitle, setBody, readContent, openPublish, listCategories, setCategory, setTags, setVisibility, setSchedule, readLayer, confirm, hasCaptcha, listReserved, isReserved, probe, toHtml, findPhoto, matchProducts, checkDraft, research, readPost, blueprint, niche, slotFor, today, VIS_NAME };
+  return { SEL, MARK, use, checkLogin, openEditor, fillTitle, setBody, readContent, openPublish, listCategories, setCategory, setTags, setVisibility, setSchedule, readLayer, confirm, hasCaptcha, listReserved, isReserved, probe, toHtml, findPhoto, matchProducts, checkDraft, nextStep, research, readPost, blueprint, niche, slotFor, today, VIS_NAME };
 })();
 console.log('TS ready:', Object.keys(TS).join(', '));
