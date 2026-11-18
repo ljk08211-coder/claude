@@ -183,6 +183,16 @@ def render(keyword, track, total, metrics, extra):
         p = sorted(extra["prices"])
         out.append(f"- 상위10 가격대: 최저 {p[0]:,.0f}원 · 중앙 {statistics.median(p):,.0f}원 · 최고 {p[-1]:,.0f}원")
     out.append(f"- 상위10 중 평점 4.3 미만: {extra['low_rated']}개 (3개 이상이면 품질 보완 기회)")
+    rev = [r["reviews"] for r in extra["top10"]]
+    total_rev, top_rev = sum(rev), max(rev) if rev else 0
+    if total_rev >= 10000:
+        size = "큼 → 주력(하루 25개 이상) 후보 가능"
+    elif total_rev >= 2000:
+        size = "중간 → 보조 상품(하루 5~10개) 수준"
+    else:
+        size = "작음 → 테스트 슬롯만"
+    out.append(f"- **시장 크기(월 1억 기준): {size}** — 상위10 리뷰 합계 {total_rev:,.0f}개, 1위 {top_rev:,.0f}개. "
+               "리뷰 수는 누적 판매량의 대리 지표일 뿐이므로 bestSelling 정렬 결과·데이터랩 검색량과 함께 판단")
     out.append("")
     out.append("### 광고 제외 상위 10개")
     out.append("| 순위 | 상품명 | 가격 | 평점 | 리뷰 | 로켓 |")
