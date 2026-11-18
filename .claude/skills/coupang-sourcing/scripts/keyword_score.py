@@ -45,6 +45,23 @@ LABELS = {
 }
 
 
+# 상품명 기반 1차 수입검사·인증 자동 표시. 구성품(토치·충전 여부)은 상세를 보고 사람이 확정한다.
+INSPECTION_RULES = [
+    ("🧪", ["잔", "컵", "글라스", "텀블러", "쉐이커", "셰이커", "지거", "바스푼", "머들러", "디캔터",
+            "병", "마개", "푸어러", "스토퍼", "얼음", "아이스", "몰드", "빨대", "스트로", "도마", "쟁반",
+            "칵테일", "와인", "위스키", "하이볼", "소주", "맥주", "식기", "주방", "보틀", "피처", "칠러"]),
+    ("⚡", ["전기", "전동", "충전", "USB", "usb", "자동", "배터리", "LED", "led", "전자"]),
+    ("📡", ["블루투스", "무선", "bluetooth"]),
+    ("🔥", ["토치", "부탄", "가스", "라이터"]),
+    ("👶", ["유아", "아기", "어린이", "키즈"]),
+]
+
+
+def inspection_flags(text):
+    flags = [tag for tag, words in INSPECTION_RULES if any(w in text for w in words)]
+    return " ".join(flags) if flags else "—"
+
+
 def pick(item, key):
     for alias in FIELD_ALIASES[key]:
         if alias in item and item[alias] is not None:
@@ -171,6 +188,11 @@ def render(keyword, track, total, metrics, extra):
     w = WEIGHTS[track]
     out = [f"## {keyword}  ·  트랙: {track}", ""]
     out.append(f"**경쟁강도 점수: {total:.0f} / 100 → {verdict(total, extra['n'])}**")
+    kw_flags = set()
+    for r in extra["top10"]:
+        kw_flags.update(f for f in inspection_flags(r["name"] + " " + keyword).split() if f != "—")
+    flag_text = " ".join(t for t, _ in INSPECTION_RULES if t in kw_flags) or "—"
+    out.append(f"**수입검사·인증: {flag_text}** (상품명 기반 자동 표시 · 상세 확인 후 확정 · 기준은 references/import-inspection.md)")
     out.append(f"(수집 {extra['n']}개, 광고 제외 {extra['organic_n']}개 기준)")
     out.append("")
     out.append("| 지표 | 값 | 점수 | 가중치 |")
@@ -195,15 +217,15 @@ def render(keyword, track, total, metrics, extra):
                "리뷰 수는 누적 판매량의 대리 지표일 뿐이므로 bestSelling 정렬 결과·데이터랩 검색량과 함께 판단")
     out.append("")
     out.append("### 광고 제외 상위 10개")
-    out.append("| 순위 | 상품명 | 가격 | 평점 | 리뷰 | 로켓 |")
-    out.append("|---|---|---|---|---|---|")
+    out.append("| 순위 | 상품명 | 가격 | 평점 | 리뷰 | 로켓 | 검사 |")
+    out.append("|---|---|---|---|---|---|---|")
     for r in extra["top10"]:
         price = f"{r['price']:,.0f}" if r["price"] else "-"
         rating = f"{r['rating']:.1f}" if r["rating"] else "-"
         name = r["name"].replace("|", "/")
         if r["url"]:
             name = f"[{name}]({r['url']})"
-        out.append(f"| {r['rank']:.0f} | {name} | {price} | {rating} | {r['reviews']:,.0f} | {'O' if r['rocket'] else ''} |")
+        out.append(f"| {r['rank']:.0f} | {name} | {price} | {rating} | {r['reviews']:,.0f} | {'O' if r['rocket'] else ''} | {inspection_flags(r['name'])} |")
     out.append("")
     return "\n".join(out)
 
